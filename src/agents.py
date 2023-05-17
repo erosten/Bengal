@@ -4,7 +4,7 @@ import random
 import chess
 
 from .moves import get_random_move, get_user_move
-from .ai.minimax_alphabeta import MiniMaxAlphaBetaSearcher
+from .ai.search import Searcher
 
 
 class Agent(ABC):
@@ -30,7 +30,7 @@ class UserAgent:
 class MinMaxAlphaBetaAgent:
     def __init__(self, depth: int = 3):
         self.depth = depth
-        self.searcher = MiniMaxAlphaBetaSearcher()
+        self.searcher = Searcher()
 
     def get_move(self, board: chess.Board) -> str:
         ai_move = self.searcher.find_move(board, depth = self.depth)
