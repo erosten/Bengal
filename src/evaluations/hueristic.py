@@ -2,7 +2,6 @@ import chess
 from chess import SquareSet, Color
 from chess import shift_up as up
 from chess import shift_down as down
-from .evaluation import Evaluation
 from .piece_square_tables import MG_TABLE, EG_TABLE, FLIP
 
 
@@ -57,8 +56,16 @@ def is_draw(board: chess.Board) -> bool:
         board.is_fivefold_repetition()
     )
 
+
+def evaluate(board: chess.Board):
+    return Hueristic().evaluate(board)
+
+def evaluate_explained(board: chess.Board):
+    return Hueristic().evaluate_explained(board)
+
+
 # Meant for quiet positions 
-class Hueristic(Evaluation):
+class Hueristic():
     def __init__(self):
 
         # push a pawn
@@ -69,7 +76,7 @@ class Hueristic(Evaluation):
 
     def evaluate(self, board: chess.Board, verbose=False):
         self.set(board)
-        return self._evaluate(board, verbose)
+        return self.__evaluate()
 
     def evaluate_explained(self, board: chess.Board):
         return self.evaluate(board, verbose=True)
@@ -79,35 +86,28 @@ class Hueristic(Evaluation):
     def set(self, board: chess.Board, verbose=False):
         self.verbose = verbose
 
-        white = ((board.turn*2)-1)*-1 # if whites turn, +1, if blacks turn, -1
-
-        # checkmate checker
-        if board.is_checkmate():
-            return board.is_checkmate() * -MATE_VALUE * white
-        
-        # draw checker
-        elif is_draw(board):
-            return 0
-
+        # why do we need to copy the board here...
+        # perhaps calls from different fns during search
+        # are reassigning board to objects somehow
         self.board = board
 
         self.pieces = {
             # access by color
             chess.WHITE: {
-                chess.PAWN: board.pieces(chess.PAWN, chess.WHITE),
-                chess.KNIGHT: board.pieces(chess.KNIGHT, chess.WHITE),
-                chess.BISHOP: board.pieces(chess.BISHOP, chess.WHITE),
-                chess.ROOK: board.pieces(chess.ROOK, chess.WHITE),
-                chess.QUEEN: board.pieces(chess.QUEEN, chess.WHITE),
-                chess.KING: board.pieces(chess.KING, chess.WHITE)
+                chess.PAWN: self.board.pieces(chess.PAWN, chess.WHITE),
+                chess.KNIGHT: self.board.pieces(chess.KNIGHT, chess.WHITE),
+                chess.BISHOP: self.board.pieces(chess.BISHOP, chess.WHITE),
+                chess.ROOK: self.board.pieces(chess.ROOK, chess.WHITE),
+                chess.QUEEN: self.board.pieces(chess.QUEEN, chess.WHITE),
+                chess.KING: self.board.pieces(chess.KING, chess.WHITE)
             },
             chess.BLACK: {
-                chess.PAWN: board.pieces(chess.PAWN, chess.BLACK),
-                chess.KNIGHT: board.pieces(chess.KNIGHT, chess.BLACK),
-                chess.BISHOP: board.pieces(chess.BISHOP, chess.BLACK),
-                chess.ROOK: board.pieces(chess.ROOK, chess.BLACK),
-                chess.QUEEN: board.pieces(chess.QUEEN, chess.BLACK),
-                chess.KING: board.pieces(chess.KING, chess.BLACK)
+                chess.PAWN: self.board.pieces(chess.PAWN, chess.BLACK),
+                chess.KNIGHT: self.board.pieces(chess.KNIGHT, chess.BLACK),
+                chess.BISHOP: self.board.pieces(chess.BISHOP, chess.BLACK),
+                chess.ROOK: self.board.pieces(chess.ROOK, chess.BLACK),
+                chess.QUEEN: self.board.pieces(chess.QUEEN, chess.BLACK),
+                chess.KING: self.board.pieces(chess.KING, chess.BLACK)
             }
         }
 
@@ -128,21 +128,19 @@ class Hueristic(Evaluation):
         # call after pieces populated
 
         # generate some helpful stuff
-        self._generate_attack_map()
+        # self._generate_attack_map()
 
-        # attacked by us with any piece and not defended by a pawn
-        self.weak_enemies = {c: self.attackedBy[c]['all'] & ~self.attackedBy[not c][chess.PAWN] for c in chess.COLORS}
+        # # attacked by us with any piece and not defended by a pawn
+        # self.weak_enemies = {c: self.attackedBy[c]['all'] & ~self.attackedBy[not c][chess.PAWN] for c in chess.COLORS}
 
-        # enemy pieces defended by a pawn or defended by at least 2 pieces (pawns incl.) and not attacked by at least two pieces
-        self.strongly_protected_enemies = {c:self.attackedBy[not c][chess.PAWN] | (self.attackedBy2[not c]['all'] & ~self.attackedBy2[c]['all']) for c in chess.COLORS}
+        # # enemy pieces defended by a pawn or defended by at least 2 pieces (pawns incl.) and not attacked by at least two pieces
+        # self.strongly_protected_enemies = {c:self.attackedBy[not c][chess.PAWN] | (self.attackedBy2[not c]['all'] & ~self.attackedBy2[c]['all']) for c in chess.COLORS}
 
-        # enemy pieces not strongly protected and attacked by us
-        self.weak_squares = {c:self.pieces[not c]['all'] & ~self.strongly_protected_enemies[c] & self.attackedBy[c]['all'] for c in chess.COLORS}
-        # import pdb; pdb.set_trace()
-        self._generate_king_rings()
-        
+        # # enemy pieces not strongly protected and attacked by us
+        # self.weak_squares = {c:self.pieces[not c]['all'] & ~self.strongly_protected_enemies[c] & self.attackedBy[c]['all'] for c in chess.COLORS}
 
-        self._generate_mobility_area()
+        # self._generate_king_rings()
+        # self._generate_mobility_area()
 
 
 
@@ -169,7 +167,7 @@ class Hueristic(Evaluation):
     
     def _generate_mobility_area(self):
         
-        def _mobility_area(self, c):
+        def _mobility_area(c):
             # pawns that are blocked
             blocked_pawns = self.pieces[c][chess.PAWN] & down(self.pieces[c][chess.PAWN])
             # blocked and not on first two ranks (technically 2,3 since no pawns on last rank)
@@ -178,11 +176,25 @@ class Hueristic(Evaluation):
             else:
                 rank_mask = chess.BB_RANKS[6] | chess.BB_RANKS[5]
             
-            kings_queens = chess.pieces[c][chess.QUEEN] | chess.pieces[c][chess.KING]
+            early_rank_pawns = self.pieces[c][chess.PAWN] & rank_mask
+            kings_queens = self.pieces[c][chess.QUEEN] | self.pieces[c][chess.KING]
 
+            if c:
+                enemy_pawn_controlled_sqs = chess.shift_down_left(self.pieces[not c][chess.PAWN]) | chess.shift_down_right(self.pieces[not c][chess.PAWN])
+            else:
+                enemy_pawn_controlled_sqs = chess.shift_up_left(self.pieces[not c][chess.PAWN]) | chess.shift_up_right(self.pieces[not c][chess.PAWN])
 
+            # pinned pieces to king
+            sqs = []
+            for p in self.pieces[c]['all']:
+                if self.board.is_pinned(c, p):
+                    sqs.append(p)
+            pinned_sqs = SquareSet(sqs)
+            return ~(blocked_pawns | early_rank_pawns | kings_queens | enemy_pawn_controlled_sqs | pinned_sqs)             
 
+        self.mobility_area = {c: _mobility_area(c) for c in [chess.WHITE, chess.BLACK]}
 
+# variables used for eval
     def _generate_king_rings(self):
         def _kingring(king: SquareSet):
             return king | chess.shift_up(king) | chess.shift_down(king) | chess.shift_left(king) | \
@@ -233,51 +245,42 @@ class Hueristic(Evaluation):
                         self.attackedBy2[color][self.board.piece_type_at(attacker)] |= squares_attacked
                         self.attackedBy2[color]['all'] |= squares_attacked
 
+# call different eval components
 
+    def __evaluate(self):
         
-
-        
-        self.mobilityArea = {}
-
-
-    def _evaluate(self, board: chess.Board, verbose=False):
         total_score = 0
+
+        white = ((self.board.turn*2)-1)*1 # if whites turn, +1, if blacks turn, -1
+        # checkmate checker
+        if self.board.is_checkmate():
+            return self.board.is_checkmate() * -MATE_VALUE * 2 * white
+        
+        # draw checker
+        elif is_draw(self.board):
+            return total_score
+        
+        # not checkmate or draw, perform eval
         # piece square table scaled by game phase
         dynamic_pst = self._pst_score()
 
         material = self._get_raw_material_score()
 
-        midgame = self._middle_game_eval()
-        # import pdb; pdb.set_trace()
-        structure = 0
-        # bonus for two bishops
-        # bishop_pair_bonus = (len(self.white_bishops) >= 2)*bishop_value*0.1 - (len(self.black_bishops) >=2)*bishop_value*0.1
-        # import pdb; pdb.set_trace()
-        # score = dynamic_pst + material + bishop_pair_bonus
+        # midgame = self._middle_game_eval()
 
-        
-        # # pawn structure
-        # pawn_score = pawns_midgame(white_pawns, black_pawns, pawn_value)
-        # # white_pawns_iso = isolated_pawns(white_pawns)
-        # # black_pawns_iso = isolated_pawns(black_pawns)
-
-
-
-        # import pdb; pdb.set_trace()
-        if verbose:
+        if self.verbose:
             print(f'Midgame: {self.mg*100:.2f}%, Endgame: {self.eg*100:.2f}%')
-            # print(f'Dynamic PST: {dynamic_pst} + material {material} + bishop pair {bishop_pair_bonus} = {score}')
         
-        total_score = dynamic_pst + material + midgame
+        total_score = dynamic_pst + material
         return total_score
 
 
-
+## eval components start here
     def _pst_score(self) -> int:
 
             mg = [0,0]
             eg = [0,0]
-
+            
             pmap = self.board.piece_map()
             for sq, piece in pmap.items():
                 # in above, when sq is 0 it hsould be A8, 
@@ -332,18 +335,19 @@ class Hueristic(Evaluation):
         score += self._pawns_mg()*2.5
         score += self._threats_mg()*2
         score += self._pieces_mg()*2
+        # score += self._mobility_mg()
         return score
 
-### Callers
+### Eval subcomponents start here
 
-## pawns
+## pawn bonuses and penalties
     def _pawns_mg(self) -> float:
 
         white_score = self._pawns_mg_color(chess.WHITE)
         black_score = self._pawns_mg_color(chess.BLACK)
         return white_score - black_score
     
-    def _pawns_mg_color(self, perspec = Color):
+    def _pawns_mg_color(self, perspec: Color):
         score = 0
 
         # assign right pawns        
@@ -376,7 +380,7 @@ class Hueristic(Evaluation):
             print(f'pawn score contribution {perspec}: {score}')
         return score
     
-## threats
+## threat bonuses
     def _threats_mg(self) -> float:
         white_score = self._threats_mg_color(chess.WHITE)
         black_score = self._threats_mg_color(chess.BLACK)
@@ -393,12 +397,13 @@ class Hueristic(Evaluation):
         for enemy in self.pieces[not perspec]['pieces']:
             sqset = chess.SquareSet([enemy])             
             score += 32 * self._hanging(sqset, enemy, perspec)
-            score += 24 * self._king_threats(sqset, enemy, perspec)
+            score += 24 * self._king_threats(sqset, perspec)
             score += rook_threat_scores[self._rooks_threat(sqset, enemy, perspec)]
             score += minor_threat_scores[self._minor_threat(sqset, enemy, perspec)]
-            score += 7 * self._weak_queen_protection(sqset, perspec)
+            score += 80 * self._threat_safe_pawns(sqset, perspec)
+
+        score += 7 * self._weak_queen_protection( perspec)
         score += 3 * self._restricted(perspec)
-        score += 80 * self._threat_safe_pawns(sqset, perspec)
 
         for pawn in self.pieces[perspec][chess.PAWN]:
             sqset = chess.SquareSet([pawn])
@@ -409,13 +414,13 @@ class Hueristic(Evaluation):
 
         return score
 
-## pieces
+## pieces bonuses and penalties
     def _pieces_mg(self) -> float:
         white_score = self._pieces_mg_color(chess.WHITE)
         black_score = self._pieces_mg_color(chess.BLACK)
         return white_score - black_score
 
-    def _pieces_mg_color(self, perspec = Color):
+    def _pieces_mg_color(self, perspec: Color):
         score = 0
         score += self._minors_behind_pawn(perspec)
         score += 6 * self._rook_on_queen_file(perspec)
@@ -435,8 +440,45 @@ class Hueristic(Evaluation):
             print(f'Score from Pieces: {perspec}: {score}')
         return score
 
-### Logic
+    def _mobility_mg(self) -> float:
+        white_score = self._mobility_mg_color(chess.WHITE)
+        black_score = self._mobility_mg_color(chess.BLACK)
+        return white_score - black_score
 
+    def _mobility_mg_color(self, c:Color):
+        # bonuses
+        b = [
+            [-62,-53,-12,-4,3,13,22,28,33],
+            [-48,-20,16,26,38,51,55,63,63,68,81,81,91,98],
+            [-60,-20,2,3,3,11,22,31,40,40,41,48,57,57,62],
+            [-30,-12,-8,-9,20,23,23,35,38,53,64,65,65,66,67,67,72,72,77,79,93,108,108,108,110,114,114,116]
+        ]
+        mob = 0
+        mobility_by_piece = []
+        for p in [chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN]:
+            mobility_by_piece.append(self._mobility(p,c))
+            mob += b[p-2][mobility_by_piece[-1]]
+
+        if self.verbose:
+            print(f'mobility bonuses: {mob}, raw mobilities: {mobility_by_piece}')
+        return mob
+    
+### Lower level logic
+
+## mobility
+
+    def _mobility(self, p: chess.PieceType, c: Color) -> int:
+
+        if p is chess.BISHOP:
+            return len(self.attackedBy[c][chess.BISHOP] & self.mobility_area[c] - self.pieces[c][chess.QUEEN])
+        elif p is chess.KNIGHT:
+            return len(self.attackedBy[c][chess.KNIGHT] & self.mobility_area[c] - self.pieces[c][chess.QUEEN])
+        elif p is chess.ROOK:
+            return len(self.attackedBy[c][chess.ROOK] & self.mobility_area[c])
+        elif p is chess.QUEEN:
+            return len(self.mobility_area[c] & self.attackedBy[c][chess.QUEEN] - (self.attackedBy[not c][chess.KNIGHT] | self.attackedBy[not c][chess.BISHOP] | self.attackedBy[not c][chess.ROOK]))
+        else:
+            return 0
 ## Pawns
     def _doubled_isolated(self, sq: chess.Square, sq_sqset: SquareSet, color: Color) -> bool:
         return self._isolated(sq, color) and self._doubled(sq_sqset, color)
@@ -611,18 +653,13 @@ class Hueristic(Evaluation):
         # defenders are attackers of the opposing color on the square of the enemy (opposing color)
         defenders = len(self.board.attackers(not color, sq))
         return defenders == 0
-
-    
+ 
     # if square is weak and our king is attacking that square, we have a king threat
-    def _king_threats(self, enemy: SquareSet, sq: chess.Square, color: Color) -> bool:
-
-        if enemy in self.weak_enemies[color]:                
-            attackers = self.board.attackers(color, sq)
-            king_attackers = self.pieces[color][chess.KING] & attackers
-            assert len(king_attackers) <= 1
-            return len(king_attackers) == 1
-        
-        return False
+    def _king_threats(self, enemy: SquareSet, color: Color) -> bool:
+        assert len(enemy) == 1
+        is_weak = self.weak_enemies[color].issubset(enemy)
+        king_attacking = len(self.attackedBy[color][chess.KING] & enemy) == 1
+        return is_weak and king_attacking
 
     # if we can move a pawn and threaten a non-pawn enemy piece
     def _pawn_push_threat(self, pawn: SquareSet, color: Color, enemies: SquareSet):
@@ -654,26 +691,28 @@ class Hueristic(Evaluation):
     
     def _threat_safe_pawns(self, enemies: SquareSet, color: Color) -> int:
         # // Protected or unattacked squares
-        import pdb; pdb.set_trace()
         safe = ~self.attackedBy[not color]['all'] | self.attackedBy[color]['all']
         safe_pawns = self.pieces[color][chess.PAWN] & safe
-        return len(safe_pawns & enemies)
-
-
-    # bonus for restricting their movement
-    def _restricted(self, color):
-        # strongly_protected = self.attackedBy[not color][chess.PAWN] | (self.attackedBy2[not color]['all'] & ~self.attackedBy2[color]['all'])
         
-        # if defended but not strongly protected and is attacked by us
-        mask = self.attackedBy[not color]['all'] & ~self.strongly_protected[not color] & self.attackedBy[color]['all']
+        # need way to get squares attacked by safe pawns
+        if color:
+            safe_pawns_att = chess.shift_up_left(safe_pawns) | chess.shift_up_right(safe_pawns)
+        else:
+            safe_pawns_att = chess.shift_down_left(safe_pawns) | chess.shift_down_right(safe_pawns)
+        
+        return len(safe_pawns_att & enemies)
 
-        return len(mask)
+    # bonus for restricting opp piece moves
+    def _restricted(self, color):        
+        # if defended but not strongly protected and is attacked by us
+        mask = self.attackedBy[not color]['all'] & ~self.strongly_protected_enemies[not color] & self.attackedBy[color]['all']
+        return len(mask & self.pieces[not color]['all'])
     
     # Additional bonus if weak piece is only protected by a queen
     # weak = enemy pieces not strongly protected and attacked by us
-    def _weak_queen_protection(self, enemy: SquareSet, color: Color):
+    def _weak_queen_protection(self, color: Color) -> int:
 
-        return len(self.weak_enemies[color] & self.attackedBy[not color][chess.QUEEN])
+        return len(self.weak_enemies[color] & self.attackedBy[not color][chess.QUEEN] & self.pieces[not color]['all'] & ~self.pieces[not color][chess.KING])
 
     ## TODO
     # def _slider_on_queen(self):
@@ -744,7 +783,7 @@ class Hueristic(Evaluation):
         # import pdb; pdb.set_trace()
         try:
             assert len(mask_1) <= 8 and len(mask_1) > 0
-        except:
+        except Exception as e:
             import pdb; pdb.set_trace()
 
         # top left
@@ -799,8 +838,12 @@ class Hueristic(Evaluation):
 
     def _rooks_threat(self, enemy: SquareSet, enemy_sq: chess.Square, color: Color) -> int:
         if len(enemy & self.attackedBy[color][chess.ROOK]) > 0:
+            if self.board.piece_type_at(enemy_sq) == None:
+                import pdb; pdb.set_trace()
             return self.board.piece_type_at(enemy_sq) # 1-6
         elif self._rook_xray(enemy, color):
+            if self.board.piece_type_at(enemy_sq) == None:
+                import pdb; pdb.set_trace()
             return self.board.piece_type_at(enemy_sq)
         return 0
 
@@ -811,9 +854,7 @@ class Hueristic(Evaluation):
             return self.board.piece_type_at(enemy_sq) # 1-6
         return 0
 
-
 ## pieces
-
     def _minors_behind_pawn(self, color: Color) -> int:
         minors = self.pieces[color][chess.BISHOP] | self.pieces[color][chess.KNIGHT]
         pawns = self.pieces[color][chess.PAWN]
@@ -898,11 +939,7 @@ class Hueristic(Evaluation):
             return 1
         
         return 2
-    
-    # piece is n, b, r, q
-    def _mobility(self, ):
-
-
+   
     # def _trapped_rook(self, rook) -> bool:
     #     if self._rook_on_open_or_semi_open_file(rook):
     #         return False
@@ -910,8 +947,6 @@ class Hueristic(Evaluation):
     #     if self._mobility() > 3:
     #         return False
         
-
-        pass
 
     def _weak_queen(self) -> int:
         pass

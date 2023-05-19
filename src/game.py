@@ -1,25 +1,25 @@
 import chess
 import chess.pgn
 from .agents import Agent, RandomAgent, UserAgent
-from .ai.evaluations import get_eval_expl_fn
-from .utils import is_draw, display
+from .evaluations.hueristic import evaluate
+from .board_state import BoardState
+from .utils import display
 
 
 class Game:
     def __init__(self, agent_w: Agent = RandomAgent(), agent_b: Agent = RandomAgent(), fen: str = None):
         self.done = False
+        self.result = None
         self.agent_w = agent_w
         self.agent_b = agent_b
         if not fen:
-            self.board = chess.Board(chess.STARTING_FEN)
+            self.board = BoardState(chess.STARTING_FEN)
         else:
-            self.board = chess.Board(fen)
+            self.board = BoardState(fen)
         
         self.first = self.board.turn
         self.eval_log = []
         display(self.board)
-
-        self.eval_fn = get_eval_expl_fn('dynamic_tricks')
 
         if isinstance(agent_w, UserAgent) and self.board.turn != chess.WHITE:
             raise AttributeError('Fen did not indicate WHITE to move but has been set has the user agent for input')
@@ -28,7 +28,7 @@ class Game:
         
 
     def eval(self):
-        eval = self.eval_fn(self.board)
+        eval = evaluate(self.board)
         self.eval_log.insert(0, eval)
         return eval
     
@@ -54,7 +54,7 @@ class Game:
             print('Game is over, start another game.')
             return
         
-        while not self.board.is_checkmate() or is_draw(self.board):
+        while not self.board.outcome(claim_draw = True):
             turn_color = 'white' if self.board.turn == chess.WHITE else 'black'
             print(f'Current eval ({turn_color}\'s turn): {self.eval()}')
 
@@ -64,7 +64,10 @@ class Game:
                 break
             self.board.push_uci(move)
             display(self.board)
-        
+
+        self.result = self.board.outcome(claim_draw=True)
+        print(f'Game ended with {self.result.result()}, by {self.result.termination}, winner {self.result.winner}')
         self.done = True
+        return
 
         

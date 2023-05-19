@@ -4,7 +4,7 @@ import random
 import chess
 
 from .moves import get_random_move, get_user_move
-from .ai.search import Searcher
+from .search import Searcher
 
 
 class Agent(ABC):
