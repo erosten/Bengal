@@ -1,17 +1,3 @@
-
-
-
-
-def is_draw(board):
-    return (
-        board.is_stalemate() or
-        board.is_insufficient_material() or
-        board.is_seventyfive_moves() or
-        board.is_fivefold_repetition()
-    )
-
-
-
 def display(board):
 
         # def print_board(self, board_state, captured={"w": [], "b": []}):

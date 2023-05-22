@@ -18,3 +18,8 @@ score object that can take mg/eg ratios and score the values for each so that wh
 add all stockfish eval params
 
 find the right place for is_draw func
+
+
+
+
+- slight difference in search test results on consecutive runs of negamax w/ TT

@@ -1,29 +1,28 @@
-import chess
 import chess.pgn
-from .agents import Agent, RandomAgent, UserAgent
-from .evaluations.hueristic import evaluate
-from .board_state import BoardState
+from .agents import Agent, Random, User
+from .hueristic import evaluate
+from .chess import Board
 from .utils import display
 
 
 class Game:
-    def __init__(self, agent_w: Agent = RandomAgent(), agent_b: Agent = RandomAgent(), fen: str = None):
+    def __init__(self, agent_w: Agent = Random(), agent_b: Agent = Random(), fen: str = None):
         self.done = False
         self.result = None
         self.agent_w = agent_w
         self.agent_b = agent_b
         if not fen:
-            self.board = BoardState(chess.STARTING_FEN)
+            self.board = Board(chess.STARTING_FEN)
         else:
-            self.board = BoardState(fen)
+            self.board = Board(fen)
         
         self.first = self.board.turn
         self.eval_log = []
         display(self.board)
 
-        if isinstance(agent_w, UserAgent) and self.board.turn != chess.WHITE:
+        if isinstance(agent_w, User) and self.board.turn != chess.WHITE:
             raise AttributeError('Fen did not indicate WHITE to move but has been set has the user agent for input')
-        elif isinstance(agent_b, UserAgent) and self.board.turn != chess.BLACK:
+        elif isinstance(agent_b, User) and self.board.turn != chess.BLACK:
             raise AttributeError('Fen did not indicate BLACK to move but has been set as the user agent for input')
         
 
