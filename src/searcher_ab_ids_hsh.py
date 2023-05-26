@@ -2,9 +2,9 @@
 from typing import Tuple
 from loguru import logger
 import sys
-logger.remove()
-logger.add(sys.stderr, level="SUCCESS")
-from .hueristic import evaluate, evaluate_no_move_board
+# logger.remove()
+# logger.add(sys.stderr, level="SUCCESS")
+from .hueristic import evaluate, MATE_VALUE
 from .chess import BoardT, Move
 
 NULL_MOVE = Move.null()
@@ -206,6 +206,10 @@ class Searcher:
 
                 return best, best_move
             else:
-                return evaluate_no_move_board(board), NULL_MOVE
+                if board.is_check(): # mate
+                    # return ply - MATE_VALUE, NULL_MOVE
+                    return MATE_VALUE if board.turn else -MATE_VALUE, NULL_MOVE
 
+                else:
+                    return 0, NULL_MOVE # stalemate
 

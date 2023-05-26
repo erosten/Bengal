@@ -1,10 +1,10 @@
 from loguru import logger
 
 
-from .hueristic import evaluate, evaluate_no_move_board
+from .hueristic import evaluate, MATE_VALUE
 from .chess import BoardT, Move
 
-
+NULL_MOVE = Move.null()
 # minimal negamax searcher
 class Searcher:
 
@@ -67,5 +67,9 @@ class Searcher:
             if found:
                 return best
             else:
-                return evaluate_no_move_board(board)
+                if board.is_check(): # mate
+                    # return ply - MATE_VALUE, NULL_MOVE
+                    return MATE_VALUE if board.turn else -MATE_VALUE
 
+                else:
+                    return 0 # stalemate

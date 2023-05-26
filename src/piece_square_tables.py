@@ -163,31 +163,23 @@ EG_KING = (
 MG_TABLE = [MG_PAWN, MG_KNIGHT, MG_BISHOP, MG_ROOK, MG_QUEEN, MG_KING]
 EG_TABLE = [EG_PAWN, EG_KNIGHT, EG_BISHOP, EG_ROOK, EG_QUEEN, EG_KING]
 
+def flip_tuple(t):
+    return tuple(val for i in reversed(range(8)) for val in t[i*8:(i+1)*8])
+
+MG_PAWN_W = flip_tuple(MG_PAWN)
+EG_PAWN_W = flip_tuple(EG_PAWN)
+MG_KNIGHT_W = flip_tuple(MG_KNIGHT)
+EG_KNIGHT_W = flip_tuple(EG_KNIGHT)
+MG_BISHOP_W = flip_tuple(MG_BISHOP)
+EG_BISHOP_W = flip_tuple(EG_BISHOP)
+MG_ROOK_W = flip_tuple(MG_ROOK)
+EG_ROOK_W = flip_tuple(EG_ROOK)
+MG_QUEEN_W = flip_tuple(MG_QUEEN)
+EG_QUEEN_W = flip_tuple(EG_QUEEN)
+MG_KING_W = flip_tuple(MG_KING)
+EG_KING_W = flip_tuple(EG_KING)
+
+MG_TABLE_W = [MG_PAWN_W, MG_KNIGHT_W, MG_BISHOP_W, MG_ROOK_W, MG_QUEEN_W, MG_KING_W]
+EG_TABLE_W = [EG_PAWN_W, EG_KNIGHT_W, EG_BISHOP_W, EG_ROOK_W, EG_QUEEN_W, EG_KING_W]
 
 
-# MG_VALUE = [82, 337, 365, 477, 1025, 0]
-# EG_VALUE = [94, 281, 297, 512, 936, 0]
-
-
-# MG_TABLE = np.zeros((12,64))
-# EG_TABLE = np.zeros((12,64))
-
-def FLIP(sq: int) -> int:
-    # not sure exactly how it works
-    # essentialy it doesn't invert the index about a diagonal symmetry, but about a horizontal one
-    # so look at the tables above as if playing from whites perspective
-    return (sq)^56
-
-# for i in range(0,12,2):
-#     p = i // 2
-#     pc = i
-#     # white occuping 1,3,5,7,9,11..
-#     for sq in range(64):
-#         # MG_TABLE[pc][sq] = MG_VALUE[p] + MG_TABLES[p][sq]
-#         # EG_TABLE[pc][sq] = EG_VALUE[p] + EG_TABLES[p][sq]
-#         # MG_TABLE[pc+1][sq] = MG_VALUE[p] + MG_TABLES[p][FLIP(sq)]
-#         # EG_TABLE[pc+1][sq] = EG_VALUE[p] + EG_TABLES[p][FLIP(sq)]
-#         MG_TABLE[pc][sq] = MG_TABLES[p][sq]
-#         EG_TABLE[pc][sq] = EG_TABLES[p][sq]
-#         MG_TABLE[pc+1][sq] = MG_TABLES[p][FLIP(sq)]
-#         EG_TABLE[pc+1][sq] = EG_TABLES[p][FLIP(sq)]

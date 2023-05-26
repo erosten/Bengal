@@ -1,10 +1,9 @@
 from abc import ABC, abstractmethod
 import random
 
-from .moves import get_random_move, get_user_move
 from .searcher_negamax import Searcher as NegaMaxSearcher
 from .searcher_alphabeta import Searcher as AlphaBetaSearcher
-from .pv_searcher import PrincipalVariationSearcher as PVSearcher
+# from .pv_searcher import PrincipalVariationSearcher as PVSearcher
 from .searcher_ab_ids_hsh import Searcher as ABTTSearcher
 from .searcher_ab_ids_hsh_q import Searcher as QABTTSearcher
 from .chess import BoardT, Move
@@ -97,15 +96,15 @@ class AlphaBetaTTQ:
     def get_move(self, board: BoardT) -> str:
         ai_move = self.searcher.find_move(board, depth = self.depth)
         
-        return ai_move.uci()
+        return ai_move
 
 
-class PrincipalVariation:
-    def __init__(self, depth: int = 3):
-        self.depth = depth
-        self.searcher = PVSearcher()
+# class PrincipalVariation:
+#     def __init__(self, depth: int = 3):
+#         self.depth = depth
+#         self.searcher = PVSearcher()
 
-    def get_move(self, board: BoardT) -> str:
-        ai_move = self.searcher.find_move(board, depth = self.depth)
+#     def get_move(self, board: BoardT) -> str:
+#         ai_move = self.searcher.find_move(board, depth = self.depth)
         
-        return ai_move.uci()
+#         return ai_move.uci()

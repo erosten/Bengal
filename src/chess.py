@@ -613,6 +613,7 @@ def _attack_table(deltas: List[int]) -> Tuple[List[Bitboard], List[Dict[Bitboard
         attacks = {}
 
         mask = _sliding_attacks(square, 0, deltas) & ~_edges(square)
+
         for subset in _carry_rippler(mask):
             attacks[subset] = _sliding_attacks(square, subset, deltas)
 
@@ -625,6 +626,27 @@ BB_DIAG_MASKS, BB_DIAG_ATTACKS = _attack_table([-9, -7, 7, 9])
 BB_FILE_MASKS, BB_FILE_ATTACKS = _attack_table([-8, 8])
 BB_RANK_MASKS, BB_RANK_ATTACKS = _attack_table([-1, 1])
 
+def _attack_table_edges(deltas: List[int]) -> Tuple[List[Bitboard], List[Dict[Bitboard, Bitboard]]]:
+    mask_table = []
+    attack_table = []
+
+    for square in SQUARES:
+        attacks = {}
+
+        # mask = _sliding_attacks(square, 0, deltas) & ~_edges(square)
+        mask = _sliding_attacks(square, 0, deltas)
+
+        for subset in _carry_rippler(mask):
+            attacks[subset] = _sliding_attacks(square, subset, deltas)
+
+        attack_table.append(attacks)
+        mask_table.append(mask)
+
+    return mask_table, attack_table
+
+BB_DIAG_MASKS_E, BB_DIAG_ATTACKS_E = _attack_table_edges([-9, -7, 7, 9])
+BB_FILE_MASKS_E, BB_FILE_ATTACKS_E = _attack_table_edges([-8, 8])
+BB_RANK_MASKS_E, BB_RANK_ATTACKS_E = _attack_table_edges([-1, 1])
 
 def _rays() -> List[List[Bitboard]]:
     rays = []
@@ -975,6 +997,24 @@ class BaseBoard:
         Returns a :class:`set of squares <chess.SquareSet>`.
         """
         return SquareSet(self.attacks_mask(square))
+    
+    def _attack_squares(self, color: Color, square: Square) -> Bitboard:
+        rank_pieces = BB_RANK_MASKS[square]
+        file_pieces = BB_FILE_MASKS[square]
+        diag_pieces = BB_DIAG_MASKS[square]
+
+        queens_and_rooks = self.queens | self.rooks
+        queens_and_bishops = self.queens | self.bishops
+
+        attackers = (
+            BB_KING_ATTACKS[square]|
+            BB_KNIGHT_ATTACKS[square]|
+            BB_RANK_ATTACKS[square][rank_pieces]|
+            BB_FILE_ATTACKS[square][file_pieces]|
+            BB_DIAG_ATTACKS[square][diag_pieces] |
+            BB_PAWN_ATTACKS[not color][square])
+
+        return attackers
 
     def _attackers_mask(self, color: Color, square: Square, occupied: Bitboard) -> Bitboard:
         rank_pieces = BB_RANK_MASKS[square] & occupied
@@ -991,7 +1031,6 @@ class BaseBoard:
             (BB_FILE_ATTACKS[square][file_pieces] & queens_and_rooks) |
             (BB_DIAG_ATTACKS[square][diag_pieces] & queens_and_bishops) |
             (BB_PAWN_ATTACKS[not color][square] & self.pawns))
-
         return attackers & self.occupied_co[color]
 
     def attackers_mask(self, color: Color, square: Square) -> Bitboard:
@@ -2069,12 +2108,32 @@ class Board(BaseBoard):
                     self._attacked_for_king(king_to, self.occupied ^ king ^ rook ^ rook_to)):
                 yield self._from_chess960(self.chess960, msb(king), candidate)
 
+
+    def generate_sorted_non_qs_moves(self, from_mask: Bitboard = BB_ALL, to_mask: Bitboard = BB_ALL) -> Iterator[Move]:
+        king_mask = self.kings & self.occupied_co[self.turn]
+        if king_mask:
+            king = msb(king_mask)
+            blockers = self._slider_blockers(king)
+            checkers = self.attackers_mask(not self.turn, king)
+            if checkers:
+                for move in self._generate_evasions(king, checkers):
+                    if self._is_safe(king, blockers, move):
+                        yield move
+            else:
+                for move in self.generate_non_qs_moves(from_mask, to_mask, king_mask):
+                    if self._is_safe(king, blockers, move):
+                        yield move
+        else:
+            yield from self.generate_non_qs_moves(from_mask, to_mask)
+
     # a bit more optimal than the python-chess version
     # by avoiding utility functions for castle hashing
-    
-    def generate_non_qs_moves(self, from_mask: Bitboard = BB_ALL, to_mask: Bitboard = BB_ALL) -> Iterator[Move]:
+    def generate_non_qs_moves(self, from_mask: Bitboard = BB_ALL, to_mask: Bitboard = BB_ALL, king_mask = BB_EMPTY) -> Iterator[Move]:
+        
         our_pieces = self.occupied_co[self.turn]
-        enemy_pieces = self.occupied_co[not self.turn]
+        enemy_pieces = self.occupied_co[not self.turn] & to_mask
+
+
 
         # pawn captures that are not pawns
         pawns = self.pawns & our_pieces & from_mask
@@ -2084,7 +2143,7 @@ class Board(BaseBoard):
                 self.occupied_co[not self.turn] & to_mask)
 
             for to_square in scan_reversed(targets):
-                # en passant captures 
+                # promotion captures
                 if square_rank(to_square) in [0, 7]:
                     yield Move(from_square, to_square, QUEEN)
                     yield Move(from_square, to_square, ROOK)
@@ -2095,41 +2154,44 @@ class Board(BaseBoard):
 
         # other captures
         # from most -> least valuable victim
-        # so in reverse is least valuable attacker
-        pieces = [self.queens, self.rooks, self.bishops, self.knights, self.pawns]
-        v_mask = ~our_pieces & to_mask
-
-        for i in range(len(pieces)):
-            victims = enemy_pieces & pieces[i]
-
-            if not victims:
+        # so in reverse is least valuable attacker 
+        # skips pawns as attackers (covered above)
+        # skips kings as victims
+        pieces = [self.kings, self.queens, self.rooks, self.bishops, self.knights, self.pawns]
+        for i in range(1,6):
+            vics = pieces[i] & enemy_pieces
+            if not vics:
                 continue
-
-            for j in range(len(pieces)-2, -1, -1):
-                attackers = our_pieces & pieces[j]
-
-                # yield moves between victims/attackers
-                for a in scan_reversed(attackers):
-                    att_vics = self.attacks_mask(a) & ~our_pieces & to_mask & victims 
-
+            for j in range(len(pieces)-2,-1,-1):
+                atters = pieces[j] & from_mask & our_pieces
+                for a in scan_reversed(atters):
+                    att_vics = self.attacks_mask(a) & vics
+                
                     for v in scan_reversed(att_vics):
-                            yield Move(a, v) 
+                        assert self.is_capture(Move(a, v))
 
-        # only attacks remaining are kings
-        king_mask = self.kings & our_pieces
-        if king_mask:
-            king = msb(king_mask)
-            moves = self.attacks_mask(king) & enemy_pieces & to_mask
-            for to_square in scan_reversed(moves):
-                yield Move(king, to_square)
+                        yield Move(a, v)                     
+
+        # king captures
+        vics = self.kings & enemy_pieces
+        if vics:
+            for j in range(len(pieces)-1,-1,-1):
+                atters = pieces[j] & from_mask & our_pieces
+                for a in scan_reversed(atters):
+                    att_vics = self.attacks_mask(a) & vics
+                
+                    for v in scan_reversed(att_vics):
+                        assert self.is_capture(Move(a, v))
+
+                        yield Move(a, v)        
     
 
-    def generate_sorted_moves_last(self, m: Move) -> Iterator[Move]:
+    def generate_sorted_moves_last(self, m: Move, from_mask = BB_ALL, to_mask = BB_ALL) -> Iterator[Move]:
         if m != Move.null():
             yield m
-        yield from self.generate_sorted_moves()
+        yield from self.generate_sorted_moves(last_move = Move.null(), from_mask=from_mask^BB_SQUARES[m.from_square], to_mask=to_mask^BB_SQUARES[m.to_square])
 
-    def generate_sorted_moves(self, last_move: Move = Move.null()) -> Iterator[Move]:
+    def generate_sorted_moves(self, last_move: Move = Move.null(), from_mask = BB_ALL, to_mask = BB_ALL) -> Iterator[Move]:
 
         king_mask = self.kings & self.occupied_co[self.turn]
         if king_mask:
@@ -2142,24 +2204,40 @@ class Board(BaseBoard):
                         yield move
             else:
                 if last_move and last_move != Move.null():
-                    yield last_move
-                for move in self.generate_sorted_pseudo_legal_moves():
+                    if self._is_safe(king, blockers, last_move):
+                        yield last_move
+                for move in self.generate_sorted_pseudo_legal_moves(from_mask, to_mask):
                     if self._is_safe(king, blockers, move):
                         yield move
         else:
             if last_move and last_move != Move.null():
                 yield last_move
-            yield from self.generate_sorted_pseudo_legal_moves()
+            yield from self.generate_sorted_pseudo_legal_moves(from_mask, to_mask)
 
+    def king_checking_mask(self, color: Color, king: Square):
+        rank_pieces = BB_RANK_MASKS_E[king] & self.occupied
+        file_pieces = BB_FILE_MASKS_E[king] & self.occupied
+        diag_pieces = BB_DIAG_MASKS_E[king] & self.occupied
+        queens_and_rooks = (self.queens | self.rooks)
+        queens_and_bishops = (self.queens | self.bishops)
+        possible_attackers_mask = (
+            (BB_KNIGHT_ATTACKS[king]) & (self.knights) |
+            (BB_RANK_ATTACKS_E[king][rank_pieces]) & queens_and_rooks |
+            (BB_FILE_ATTACKS_E[king][file_pieces]) & queens_and_rooks |
+            (BB_DIAG_ATTACKS_E[king][diag_pieces]) & queens_and_bishops |
+            (BB_PAWN_ATTACKS[not color][king] & self.pawns))
 
-
+        return possible_attackers_mask
+        
     # Moves that are OK here
     # Moving king into check
     # Moving a piece that is blocking a checked king
     # En passant that moves out of a pin on king (some other stuff maybe?)
     def generate_sorted_pseudo_legal_moves(self, from_mask: Bitboard = BB_ALL, to_mask: Bitboard = BB_ALL) -> Iterator[Move]:
         our_pieces = self.occupied_co[self.turn]
-        enemy_pieces = self.occupied_co[not self.turn]
+        enemy_pieces = self.occupied_co[not self.turn] & to_mask
+
+
 
         # pawn captures that are not pawns
         pawns = self.pawns & our_pieces & from_mask
@@ -2169,7 +2247,8 @@ class Board(BaseBoard):
                 self.occupied_co[not self.turn] & to_mask)
 
             for to_square in scan_reversed(targets):
-                # en passant captures 
+                # keep track if they check and remove from possible checkers
+                # en passant captures
                 if square_rank(to_square) in [0, 7]:
                     yield Move(from_square, to_square, QUEEN)
                     yield Move(from_square, to_square, ROOK)
@@ -2180,48 +2259,60 @@ class Board(BaseBoard):
 
         # other captures
         # from most -> least valuable victim
-        # so in reverse is least valuable attacker
-        pieces = [self.queens, self.rooks, self.bishops, self.knights, self.pawns]
-        v_mask = ~our_pieces & to_mask
-
-        for i in range(len(pieces)):
-            victims = enemy_pieces & pieces[i]
-
-            if not victims:
+        # so in reverse is least valuable attacker 
+        # skips pawns as attackers (covered above)
+        # skips kings as victims
+        pieces = [self.kings, self.queens, self.rooks, self.bishops, self.knights, self.pawns]
+        for i in range(1,6):
+            vics = pieces[i] & enemy_pieces
+            if not vics:
                 continue
-
-            for j in range(len(pieces)-2, -1, -1):
-                attackers = our_pieces & pieces[j]
-
-                # yield moves between victims/attackers
-                for a in scan_reversed(attackers):
-                    att_vics = self.attacks_mask(a) & ~our_pieces & to_mask & victims 
-
+            for j in range(len(pieces)-2,-1,-1):
+                atters = pieces[j] & from_mask & our_pieces
+                for a in scan_reversed(atters):
+                    att_vics = self.attacks_mask(a) & vics
+                
                     for v in scan_reversed(att_vics):
-                            yield Move(a, v) 
+                        assert self.is_capture(Move(a, v))
 
-        # only attacks remaining are kings
-        king_mask = self.kings & our_pieces
-        if king_mask:
-            king = msb(king_mask)
-            moves = self.attacks_mask(king) & enemy_pieces & to_mask
-            for to_square in scan_reversed(moves):
-                yield Move(king, to_square)
-            
+                        yield Move(a, v)                     
+
+        # king captures
+        vics = self.kings & enemy_pieces
+        if vics:
+            for j in range(len(pieces)-1,-1,-1):
+                atters = pieces[j] & from_mask & our_pieces
+                for a in scan_reversed(atters):
+                    att_vics = self.attacks_mask(a) & vics
+                
+                    for v in scan_reversed(att_vics):
+                        assert self.is_capture(Move(a, v))
+
+                        yield Move(a, v)               
+        # Generate en passants captures (other than en passants)
+        if self.ep_square:
+            yield from self.generate_pseudo_legal_ep(from_mask, to_mask)
+
+        # Generate moves from non captures
+        # 1. Pawn promotions
+        # 2. Pawn checks
+        # 3. Knight checks
+        # 4. Bishop checks
+        # 5. Rook checks
+        # 6. Queen checks
+        # 7. other moves
+        # If it is a check, yield it first
+        # If not, cache it for later (provides better lower move ordering as well)
+
+        enemy_king_mask = self.kings & enemy_pieces
+        if enemy_king_mask:
+            enemy_king = msb(enemy_king_mask)
+        else:
+            enemy_king = BB_EMPTY
+        #     checkers = self.king_checking_mask(self.turn, enemy_king)
+        # else:
+        #     checkers = BB_EMPTY
         
-        # Generate castling moves.
-        if from_mask & self.kings:
-            yield from self.generate_castling_moves(from_mask, to_mask)
-
-        # non-attacking piece moves
-        # attacks mask moves minus opp pieces
-        non_pawns = our_pieces & ~self.pawns & from_mask
-        for from_sq in scan_reversed(non_pawns):
-            moves = self.attacks_mask(from_sq) & ~our_pieces & to_mask & ~enemy_pieces
-            for to_sq in scan_reversed(moves):
-                yield Move(from_sq, to_sq)
-
-        # rest are non-capture pawn moves
         # Prepare pawn advance generation.
         if self.turn == WHITE:
             single_moves = pawns << 8 & ~self.occupied
@@ -2234,6 +2325,8 @@ class Board(BaseBoard):
         double_moves &= to_mask
 
         # Generate single pawn moves.
+        pawn_cache = []
+
         for to_square in scan_reversed(single_moves):
             from_square = to_square + (8 if self.turn == BLACK else -8)
 
@@ -2243,16 +2336,104 @@ class Board(BaseBoard):
                 yield Move(from_square, to_square, BISHOP)
                 yield Move(from_square, to_square, KNIGHT)
             else:
-                yield Move(from_square, to_square)
+                if enemy_king and BB_PAWN_ATTACKS[not self.turn][enemy_king] & BB_SQUARES[to_square]:
+                    assert self.gives_check(Move(from_square, to_square))
+                    yield Move(from_square, to_square)
+                else:
+                    pawn_cache.append((from_square, to_square))
 
         # Generate double pawn moves.
         for to_square in scan_reversed(double_moves):
             from_square = to_square + (16 if self.turn == BLACK else -16)
-            yield Move(from_square, to_square)
+            if enemy_king and BB_PAWN_ATTACKS[not self.turn][enemy_king] & BB_SQUARES[to_square]:
+                assert self.gives_check(Move(from_square, to_square))
+                yield Move(from_square, to_square)
+            else:
+                pawn_cache.append((from_square, to_square))
 
-        # Generate en passants
-        if self.ep_square:
-            yield from self.generate_pseudo_legal_ep(from_mask, to_mask)
+
+        ours_mask = our_pieces & from_mask
+        open_sq_mask = ~our_pieces & to_mask & ~enemy_pieces
+
+        # # Generate piece moves
+        knights = self.knights & ours_mask
+        knight_cache = []
+        for from_sq in scan_reversed(knights):
+            moves = self.attacks_mask(from_sq) & open_sq_mask
+            for to_sq in scan_reversed(moves):
+                if enemy_king and BB_KNIGHT_ATTACKS[enemy_king] & BB_SQUARES[to_sq]:
+                    assert self.gives_check(Move(from_sq, to_sq))
+                    yield Move(from_sq, to_sq)
+                else:
+                    knight_cache.append((from_sq, to_sq))
+        
+        rank_pieces = BB_RANK_MASKS[enemy_king] & self.occupied
+        file_pieces = BB_FILE_MASKS[enemy_king] & self.occupied
+        diag_pieces = BB_DIAG_MASKS[enemy_king] & our_pieces
+
+        bishop_cache = []
+        bishops = self.bishops & ours_mask
+        diag_check_mask = BB_DIAG_ATTACKS[enemy_king][diag_pieces]
+        for from_sq in scan_reversed(bishops):
+            moves = self.attacks_mask(from_sq) & open_sq_mask
+            for to_sq in scan_reversed(moves):
+                if enemy_king and diag_check_mask & BB_SQUARES[to_sq]:
+                    # assert self.gives_check(Move(from_sq, to_sq))
+                    yield Move(from_sq, to_sq)
+                else:
+                    bishop_cache.append((from_sq, to_sq))
+                # yield Move(from_sq, to_sq)
+
+        rook_cache = []
+        rooks = self.rooks & ours_mask
+        rank_check_mask = BB_RANK_ATTACKS[enemy_king][rank_pieces]
+        file_check_mask = BB_FILE_ATTACKS[enemy_king][file_pieces]
+
+        for from_sq in scan_reversed(rooks):
+            moves = self.attacks_mask(from_sq) & open_sq_mask
+            for to_sq in scan_reversed(moves):
+                if enemy_king and (rank_check_mask & BB_SQUARES[to_sq] | file_check_mask & BB_SQUARES[to_sq]):
+                    # assert self.gives_check(Move(from_sq, to_sq)), f'{self.fen}, {Move(from_sq, to_sq)}'
+                    yield Move(from_sq, to_sq)
+                else:
+                    rook_cache.append((from_sq, to_sq))
+                # yield Move(from_sq, to_sq)
+
+        queens = self.queens & ours_mask
+        queen_cache = []
+        for from_sq in scan_reversed(queens):
+            moves = self.attacks_mask(from_sq) & open_sq_mask
+            for to_sq in scan_reversed(moves):
+                if enemy_king and (rank_check_mask | file_check_mask | diag_check_mask) & BB_SQUARES[to_sq]:
+                    # assert self.gives_check(Move(from_sq, to_sq))
+                    yield Move(from_sq, to_sq)
+                else:
+                    queen_cache.append((from_sq, to_sq))
+                # yield Move(from_sq, to_sq)
+
+        king_cache = []
+        for from_sq in scan_reversed(self.kings & ours_mask):
+            moves = self.attacks_mask(from_sq) & open_sq_mask
+            for to_sq in scan_reversed(moves):
+                king_cache.append((from_sq, to_sq))
+                # yield Move(from_sq, to_sq)
+
+       # # Generate remaining non-capture, non-checking piece moves
+        for cache in [pawn_cache, knight_cache, bishop_cache, rook_cache, queen_cache, king_cache]:
+            while cache:
+                fr, to = cache.pop()
+                yield Move(fr, to)
+
+
+        # # Generate castling moves.
+        if from_mask & self.kings:
+            yield from self.generate_castling_moves(from_mask, to_mask)
+
+ 
+
+
+
+
 
 
 

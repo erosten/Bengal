@@ -1,9 +1,11 @@
-from .chess import SquareSet, Color, shift_2_up as up, shift_down as down
 from .chess import PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING
-from .chess import WHITE, BLACK, COLORS, PIECE_TYPES
-from .chess import scan_reversed, square_mirror
+from .chess import WHITE, BLACK, COLORS, PIECE_TYPES, Color
+from .chess import scan_reversed, square_file, square_rank
 from .chess import BoardT
-from .piece_square_tables import MG_TABLE, EG_TABLE
+from .chess import Square, SquareSet, BB_FILES
+from .chess import shift_up, shift_down, shift_up_right, shift_up_left
+from .chess import shift_down_right, shift_down_left, shift_right, shift_left
+from .piece_square_tables import MG_TABLE, EG_TABLE, MG_TABLE_W, EG_TABLE_W
 
 # need to change later maybe
 Us = 'US'
@@ -23,45 +25,20 @@ ONE = "1"
 ## TUNE
 
 
-def evaluate(board: BoardT, verbose: bool = False) -> float:
+def evaluate(board: BoardT, ply: int = 0, verbose: bool = False) -> float:
+    try:
+        next(board.generate_legal_moves())
+    except StopIteration: # no moves
+        if board.is_check():
+            # + ply prioritizes shorter checkmates
+            return -MATE_VALUE + ply
+        else:
+            return  0 # stalemate
     if board.is_insufficient_material() or \
         board.is_seventyfive_moves() or \
             board.is_fivefold_repetition():
         return 0
-    
-    # TODO
-    # somehow need to optimize this
-    # probably by keeping track in BoardState
-    try:
-        next(board.generate_legal_moves())
-    except StopIteration: # no moves
-
-    # if not any(board.generate_legal_moves()):
-        if board.is_check(): #mate
-            return MATE_VALUE if board.turn else -MATE_VALUE
-        else:
-            return 0 #stalemate
-        
-
-    # gamePhase = 0
-    # for p_type, pieces in zip(
-    #     chess.PIECE_TYPES,
-    #     [board.pawns, board.knights, board.bishops, board.rooks, board.queens, board.kings]
-    # ):
-    #     gamePhase += pieces.bit_count() * GAME_PHASE_VALUES[p_type-1]
-
-    # # calc phase
-    # mgPhase = gamePhase
-    # if mgPhase > 24:
-    #     mgPhase = 24
-    # egPhase = 24 - mgPhase
-
-    # # calc final result from early game/mid game contributions
-    # eg = egPhase / 24
-    # mg = mgPhase / 24
-
-
-    ## material from pieces
+    # material from pieces
     occ_co_pieces = {
         True: {
             PAWN: board.occupied_co[True] & board.pawns,
@@ -81,15 +58,6 @@ def evaluate(board: BoardT, verbose: bool = False) -> float:
             KING: board.occupied_co[False] & board.kings,
         }
     }
-    # values = [
-    #     MG_VALUE[chess.PAWN-1] * mg + EG_VALUE[chess.PAWN-1] * eg,
-    #     MG_VALUE[chess.KNIGHT-1] * mg + EG_VALUE[chess.KNIGHT-1] * eg,
-    #     MG_VALUE[chess.BISHOP-1] * mg + EG_VALUE[chess.BISHOP-1] * eg,
-    #     MG_VALUE[chess.ROOK-1] * mg + EG_VALUE[chess.ROOK-1] * eg,
-    #     MG_VALUE[chess.QUEEN-1] * mg + EG_VALUE[chess.QUEEN-1] * eg,
-    #     MG_VALUE[chess.KING-1] * mg + EG_VALUE[chess.KING-1] * eg,
-    #     MG_VALUE[chess.PAWN-1] * mg + EG_VALUE[chess.PAWN-1] * eg,
-    # ]
 
     # eval 
     # material + pst scoring
@@ -100,8 +68,8 @@ def evaluate(board: BoardT, verbose: bool = False) -> float:
     counts = [[],[]]
     for c in COLORS:
         for p_type in PIECE_TYPES:
-            # pcs = occ_co_pieces[c][p_type]
-            pcs = board.occupied_co_p[c][p_type-1]
+            pcs = occ_co_pieces[c][p_type]
+            # pcs = board.occupied_co_p[c][p_type-1]
 
             # get counts and increment game phase
             p_type_idx = p_type-1
@@ -114,9 +82,11 @@ def evaluate(board: BoardT, verbose: bool = False) -> float:
                 # A1 in top right for python-chess
                 # but A1 in bot right for PST
                 if c:
-                    pc = square_mirror(pc)
-                mg_pst[c] += MG_TABLE[p_type-1][pc]
-                eg_pst[c] += EG_TABLE[p_type-1][pc]               
+                    mg_pst[c] += MG_TABLE_W[p_type-1][pc]
+                    eg_pst[c] += EG_TABLE_W[p_type-1][pc] 
+                else:
+                    mg_pst[c] += MG_TABLE[p_type-1][pc]
+                    eg_pst[c] += EG_TABLE[p_type-1][pc]               
 
     if mgPhase > 24:
         mgPhase = 24
@@ -142,119 +112,217 @@ def evaluate(board: BoardT, verbose: bool = False) -> float:
         MG_VALUE[KING-1] * mg + EG_VALUE[KING-1] * eg,
     )
     for i in range(6):
-        material[c] += counts[c][i]*values[i]
-        material[not c] += counts[not c][i]*values[i]
+        material[WHITE] += counts[WHITE][i]*values[i]
+        material[BLACK] += counts[BLACK][i]*values[i]
     # count of piece * tapered value of 
     # material[chess.WHITE] = sum([cnt*values[i] for i, cnt in enumerate(counts[chess.WHITE])])
     # material[chess.BLACK] = sum([cnt*values[i] for i, cnt in enumerate(counts[chess.BLACK])])
     
     material_diff = material[WHITE] - material[BLACK]
 
-    score = material_diff + pst
+    # pawns
+    # pawns_mg = _pawns_mg_color(occ_co_pieces[c][PAWN]) - _pawns_mg_color(occ_co_pieces[not c][PAWN])
+    pawns_mg = 0
+
+
+    score = material_diff + pst + pawns_mg
     if verbose:
-        print(material_diff, pst, score)
+        print('Material', 'PST', 'Pawns MG', 'Score')
+        print(material_diff, pst, pawns_mg, score)
     return score if board.turn else -score
     # return material + pst
 
 # stalemate or checkmate
-def evaluate_no_move_board(board: BoardT) -> float:
-    if board.is_check():
-        return MATE_VALUE if board.turn else -MATE_VALUE
-    elif board.is_stalemate():
-        return 0
-    elif board.is_insufficient_material():
-        return 0
-    else:
-        # print('?')
-        import pdb; pdb.set_trace()
-        return -10000000000000000000000000
+# def evaluate_no_move_board(board: BoardT, ply: int) -> float:
+#     if board.is_check():
+#         return MATE_VALUE if board.turn else -MATE_VALUE
+#     elif board.is_stalemate():
+#         return 0
+#     elif board.is_insufficient_material():
+#         return 0
+#     else:
+#         # print('?')
+#         import pdb; pdb.set_trace()
+#         return -10000000000000000000000000
 
 def evaluate_explained(board: BoardT) -> float:
     return evaluate(board, verbose=True)
 
 
-# def _get_raw_material_score(board: BoardState, mg, eg) -> float:
+# def _pawns_mg_color(pawns: int, c: Color):
+#     score = 0
 
-#     def value(piece: chess.PIECE_TYPES):
-#         return MG_VALUE[piece-1] * mg + EG_VALUE[piece-1] * eg
+
+#     # for ranks 5,6 increased bonus for blocked pawns 
+#     blocking_bonuses = [5, 8]
     
-#     # material value scaled by game phase
-#     values = [
-#         value(chess.PAWN),
-#         value(chess.KNIGHT),
-#         value(chess.BISHOP),
-#         value(chess.ROOK),
-#         value(chess.QUEEN),
-#         value(chess.KING),
-#     ]
-
-#     white_material, black_material = 0, 0
-#     for val, pieces in zip(
-#         values,
-#         [board.pawns, board.knights, board.bishops, board.rooks, board.queens, board.kings]
-#     ):
-#         white_material += bin(board.occupied_co[True] & pieces).count("1") * val
-#         black_material += bin(board.occupied_co[False] & pieces).count("1") * val
-
-#     # total raw material difference
-#     return white_material - black_material
-
-
-## eval components start here
-# def _pst_score(board, mg_ratio, eg_ratio) -> float:
-#     mg = [0,0]
-#     eg = [0,0]
+#     for sq in pawns:
+#         sq_sqset = SquareSet([sq])
 
 
 
-#     for c in chess.COLORS:
-#         pieces = board.occupied_co[c]
-#         table_idx_to_pieces = {
-#             chess.PAWN-1: pieces & board.pawns,
-#             chess.KNIGHT-1: pieces & board.knights,
-#             chess.BISHOP-1: pieces & board.bishops,
-#             chess.ROOK-1: pieces & board.rooks,
-#             chess.QUEEN-1: pieces & board.queens,
-#             chess.KING-1: pieces & board.kings,
-#         }
+#         if doubled_isolated(sq, sq_sqset, c):
+#             score -= 6
+#         elif isolated(sq, c):
+#             score -= 3
+#         # elif _backward():
+#         #      score -= 9
+        
+#         score -= doubled(sq_sqset, c) * 6
+#         score += connected_bonus(sq, sq_sqset, c)
+#         score -= 7 * weak_and_unopposed(sq, sq_sqset, c)
 
-#         for table_idx, pcs in table_idx_to_pieces.items():
-#             for pc in chess.scan_reversed(pcs):
-#                 # A1 in top right for python-chess
-#                 # but A1 in bot right for PST
-#                 if c:
-#                     pc = chess.square_mirror(pc)
-
-#                 mg[c] += MG_TABLE[table_idx][pc]
-#                 eg[c] += EG_TABLE[table_idx][pc]               
-
-#     # tapered eval
-#     mgScore = mg[chess.WHITE] - mg[chess.BLACK]
-#     egScore = eg[chess.WHITE] - eg[chess.BLACK] #endgame
-#     res = mgScore * mg_ratio + egScore * eg_ratio
-#     return res
+#         # add blockedstarting on 5th rank
+#         if blocked(sq_sqset, c) and rank(sq, c) >= 5:
+#             score += blocking_bonuses[rank(sq, c) - 5]
+    
+#     # if True:
+#     #     print(f'pawn score contribution {c}: {score}')
+#     return score
 
 
-# def evaluate_explained(board: chess.Board):
-#     return Hueristic().evaluate_explained(board)
+# def _doubled_isolated(sq: Square, sq_sqset: SquareSet, color: Color) -> bool:
+#     return _isolated(sq, color) and _doubled(sq_sqset, color)
+
+# def _weak_and_unopposed(sq: Square, sq_sqset: SquareSet, color: Color) -> bool:
+#     if _opposed(sq_sqset, color):
+#         return False
+
+#     # is it weak?
+#     # TODO: Backward?
+#     # return _isolated(sq, my_pawns) or _backward()
+#     return _isolated(sq, color)
+
+# # no pawns on adjacent files     
+# def _isolated(sq: Square, color: Color) -> bool:
+#     mask = SquareSet(BB_FILES[square_file(sq)])
+
+#     left = shift_left(mask)
+#     right = shift_right(mask)
+
+#     adj_file_pawns = (left | right) & pieces[color][PAWN]
+#     return len(adj_file_pawns) == 0
+
+# # In chess, an doubled pawn is a pawn which has another friendly pawn on same file but in Stockfish we attach doubled pawn penalty only for pawn which has another friendly pawn on square directly behind that pawn and is not supported.
+# # From https://hxim.github.io/Stockfish-Evaluation-Guide/
+# def _doubled(self, sq_sqset: SquareSet, color: Color) -> bool:
+
+#     my_pawns = self.pieces[color][PAWN]
+
+#     # check if any pawns directly behind
+#     if color: # white
+#         mask = shift_down(sq_sqset)
+#     else:
+#         mask = shift_up(sq_sqset)
+
+#     pawns_right_behind = mask & my_pawns
+
+#     if len(pawns_right_behind) == 0:
+#             return False
+
+#     # check if those pawns are supported
+#     if color: # white, check down, left/right
+#         mask = shift_down_left(sq_sqset) | shift_down_right(sq_sqset)
+#     else: # black, check up,left/right
+#         mask = shift_up_left(sq_sqset) | shift_up_right(sq_sqset)
+
+#     support_pawns = mask & my_pawns
+
+#     if len(support_pawns) == 0:
+#             return True
+
+#     return False
+
+# # our own pawns are blocked
+# def _blocked(sq_sqset: SquareSet, color: Color) -> bool:
+#     if color: # white, blocked are things up
+#         mask = shift_up(sq_sqset)
+#     else: # black, blocked are things down
+#         mask = shift_down(sq_sqset)
+
+#     pawns_in_front_of_my_pawns = mask & pieces[color][PAWN]
+
+#     assert len(pawns_in_front_of_my_pawns) <= 1
+#     return len(pawns_in_front_of_my_pawns) > 0
+
+# # cannot be safely advanced part needs attacks/moves
+# def _backward() -> bool:
+#     pass
 
 
-# # Meant for quiet positions 
-# class Hueristic():
-#     def __init__(self):
+#     # def weak_unopposed_pawn():
+#     #      pass
+#     # def blocked():
+#     #      pass
 
-#         # push a pawn
-#         self.pawn_push = {
-#             chess.WHITE: up,
-#             chess.BLACK: down
-#         }
+# def _connected_bonus(sq: Square, sq_sqset: SquareSet, color: Color) -> int:
+        
 
-#     def evaluate(self, board: chess.Board, verbose=False):
-#         self.set(board)
-#         return self.__evaluate()
+#         supp = _supported(sq_sqset, color)
+#         phal = _phalanx(sq_sqset, color)
 
-#     def evaluate_explained(self, board: chess.Board):
-#         return self.evaluate(board, verbose=True)
+#         # connected pawns further up are more valuable
+#         rank_scale = [0, 3, 4, 6, 15, 24, 48]
+#         if supp or phal: # is connected
+#             r = _rank(sq, color)
+
+#             if r in (0,7): # first or last rank
+#                     return 0
+            
+#             opp = _opposed(sq_sqset, color)
+#             return rank_scale[r-1] * (2 + int(phal) - int(opp)) + 11 * supp
+#         else:
+#             return 0
+
+# # has pawn of opposing color right in front of it
+# def _opposed(sq_sqset: SquareSet, color: Color) -> bool:
+#     if color: # white
+#         mask = shift_up(sq_sqset)
+#     else:
+#         mask = shift_down(sq_sqset)
+
+#     opposed = mask & pieces[not color][chess.PAWN]
+
+#     assert len(opposed) <= 1
+#     return len(opposed) == 1
+
+
+# def _rank(sq: Square, color: Color) -> int:
+#     if color: # white, so more rank is higher -> if sq is A8, chess.square_rank = 7 and return 7
+#         return square_rank(sq)
+#     else: # black, so more rank is lower -> if sq is A3, chess.square_rank = 2 and return 7 - 2 => 5
+#         return 7 - square_rank(sq)
+
+#     # 0 or 1
+#     # adjacent pawns to phalanx
+
+# def _phalanx(sq_sqset: SquareSet, color: Color) -> bool: 
+#     mask = shift_left(sq_sqset) | shift_right(sq_sqset)
+#     phalanx_pawns = mask & pieces[color][chess.PAWN]
+#     assert len(phalanx_pawns) <= 2
+#     return len(phalanx_pawns) >= 1
+
+#     # number of pawn defenders: 0,1 or 2
+
+# def _supported(sq_sqset: SquareSet, color: Color) -> bool:
+        
+#     if color: # white, check down, left/right
+#         mask = shift_down_left(sq_sqset) | shift_down_right(sq_sqset)
+#     else: # black, check up,left/right
+#         mask = shift_up_left(sq_sqset) | shift_up_right(sq_sqset)
+    
+#     supp_pawns = mask & pieces[color][chess.PAWN]
+#     assert len(supp_pawns) <= 2
+#     return len(supp_pawns) >= 1
+
+
+
+
+
+
+
+
+
     
 #     # entrypoint for _evaluate
 #     # set board, pieces and game phase
@@ -360,36 +428,6 @@ def evaluate_explained(board: BoardT) -> float:
         
 #         total_score = material 
 #         return total_score
-
-
-
-#     def _get_raw_material_score(self) -> int:
-
-#         def value(piece: chess.PIECE_TYPES):
-#             return MG_VALUE[piece-1] * self.mg + EG_VALUE[piece-1] * self.eg
-        
-#         # material value scaled by game phase
-#         values = [
-#             value(chess.PAWN),
-#             value(chess.KNIGHT),
-#             value(chess.BISHOP),
-#             value(chess.ROOK),
-#             value(chess.QUEEN),
-#             value(chess.KING),
-#         ]
-
-#         white_material, black_material = 0, 0
-#         for val, pieces in zip(
-#             values,
-#             [self.board.pawns, self.board.knights, self.board.bishops, self.board.rooks, self.board.kings]
-#         ):
-#             white_material += bin(self.board.occupied_co[True] & pieces).count("1") * val
-#             black_material += bin(self.board.occupied_co[False] & pieces).count("1") * val
-
-
-#         # total raw material difference
-#         return white_material - black_material
-
 
 
     

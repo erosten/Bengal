@@ -3,9 +3,10 @@
 Notable changes to this project will be documented in this file.
 
 
-## [0.0.1]
+## [0.0.1] - Initial Release
 
 ### Feature List
+ - Opening Book Support
 
 #### Evaluation
  - Material Value
@@ -17,13 +18,14 @@ Notable changes to this project will be documented in this file.
  - Iterative Deepening
  - Principal Variation Tracking
  - Quiescence Search
- - Null Move Pruning (?)
+ - Null Move Pruning
+ - Mate Distance Pruning
+ - Aspiration Windows
 
 #### Move Ordering
+ - Principal Variation
+ - Killer Moves
  - MVV/LVA
- - Killer moves
- - Search last in PV
-
 
 
 
