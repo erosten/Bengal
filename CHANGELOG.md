@@ -5,6 +5,9 @@ Notable changes to this project will be documented in this file.
 
 ## [0.0.1] - Initial Release
 
+- Works with Bengal-Bot on Lichess and plays above 1000 rating - I'd call that a v0.01
+
+
 ### Feature List
  - Opening Book Support
 
@@ -33,6 +36,3 @@ Notable changes to this project will be documented in this file.
  - Mate in 2 (~221 tests)
  - Mate in 3 (~500 tests)
  - Perft (~30 tests)
-
-
-

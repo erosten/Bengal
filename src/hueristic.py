@@ -36,7 +36,8 @@ def evaluate(board: BoardT, ply: int = 0, verbose: bool = False) -> float:
             return  0 # stalemate
     if board.is_insufficient_material() or \
         board.is_seventyfive_moves() or \
-            board.is_fivefold_repetition():
+        board.is_fivefold_repetition() or \
+        board.is_repetition():
         return 0
     # material from pieces
     occ_co_pieces = {
