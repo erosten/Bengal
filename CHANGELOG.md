@@ -18,14 +18,21 @@ Notable changes to this project will be documented in this file.
  - Iterative Deepening
  - Principal Variation Tracking
  - Quiescence Search
- - Null Move Pruning
+ - Null Move Heuristic (Pruning)
  - Mate Distance Pruning
- - Aspiration Windows
+ - Aspiration Windows [Bugged]
 
 #### Move Ordering
  - Principal Variation
- - Killer Moves
+ - Hash (TT) Moves
+ - Killer Hueristic
  - MVV/LVA
+
+### Testing
+ - Search test on a variety of positions, especially testing en passant, promotions, checkmate (~30 tests)
+ - Mate in 2 (~221 tests)
+ - Mate in 3 (~500 tests)
+ - Perft (~30 tests)
 
 
 

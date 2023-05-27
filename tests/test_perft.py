@@ -60,19 +60,20 @@ def gen(additional_tests: List[Tuple[str, int]] = []):
     from data.original_search_test_data import DATA
     d = sorted(DATA, key = lambda x: x['depth'])
     for test in tqdm(d):
-        # if test['depth'] >= 4:
-        #     continue
+        if test['depth'] >= 4:
+            break
         print(test)
         out = {}
         n = test['nodes']
         d = test['depth']
         n1.append(n)
-
         fen = test['fen']
         out['nodes'] = n
         out['depth'] = d
         out['fen'] = fen
         b = Board(fen)
+        out['perft'] = perft(d,b)
+
         t1 = time.time()
         n = perft_test(d, b)
         t = time.time()-t1
@@ -114,7 +115,6 @@ def gen(additional_tests: List[Tuple[str, int]] = []):
 
 
 ADDITIONAL_DATA = [
-    ('r2Q1k1r/ppp1bppp/4b3/1B6/5q2/2P5/PPP2PPP/R3R1K1 w - - 0 2', 3),
     ('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', 4)
 ]
 

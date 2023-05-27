@@ -1,0 +1,7 @@
+- Better move ordering (winning captures)
+- Debug issue with Aspiration windows PV tracking
+- PVS (Principal Variation Search)
+- Futility Pruning
+- Delta Pruning
+- Static Exchange Evaluation
+- Additional Evaluation Components

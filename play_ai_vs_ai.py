@@ -1,10 +1,10 @@
 from src.game import Game
-from src.agents import NegaMax, AlphaBetaTT, AlphaBetaTTQ, Random
-import random
-import time
+from src.agents import NegaMax, AlphaBetaTTQ, Random
+
+
 def run_game(fen: str):
     try:
-        agent_w = AlphaBetaTTQ(depth=5)
+        agent_w = AlphaBetaTTQ(depth=8)
         agent_b = AlphaBetaTTQ(depth=3)
         game = Game(agent_w, agent_b, fen)
         game.play()

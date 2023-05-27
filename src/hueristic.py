@@ -73,20 +73,25 @@ def evaluate(board: BoardT, ply: int = 0, verbose: bool = False) -> float:
 
             # get counts and increment game phase
             p_type_idx = p_type-1
-            cnt = pcs.bit_count()
-            counts[c].append(cnt)
-            mgPhase += cnt*GAME_PHASE_VALUES[p_type_idx]
+            cnt = 0
+            # cnt = pcs.bit_count()
+            # counts[c].append(cnt)
 
             # pst stuff
             for pc in scan_reversed(pcs):
+                cnt += 1
                 # A1 in top right for python-chess
                 # but A1 in bot right for PST
                 if c:
-                    mg_pst[c] += MG_TABLE_W[p_type-1][pc]
-                    eg_pst[c] += EG_TABLE_W[p_type-1][pc] 
+                    mg_pst[c] += MG_TABLE_W[p_type_idx][pc]
+                    eg_pst[c] += EG_TABLE_W[p_type_idx][pc] 
                 else:
-                    mg_pst[c] += MG_TABLE[p_type-1][pc]
-                    eg_pst[c] += EG_TABLE[p_type-1][pc]               
+                    mg_pst[c] += MG_TABLE[p_type_idx][pc]
+                    eg_pst[c] += EG_TABLE[p_type_idx][pc] 
+            
+            counts[c].append(cnt)
+            mgPhase += cnt*GAME_PHASE_VALUES[p_type_idx]
+
 
     if mgPhase > 24:
         mgPhase = 24

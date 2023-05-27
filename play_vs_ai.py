@@ -1,9 +1,9 @@
 from src.game import Game
-from src.agents import UserAgent, MinMaxAlphaBetaAgent
+from src.agents import NegaMax, AlphaBetaTTQ, User
 
 def run_game(fen: str):
-    agent_b = MinMaxAlphaBetaAgent(depth=3)
-    agent_w = UserAgent()
+    agent_b = AlphaBetaTTQ(depth=5)
+    agent_w = User()
     game = Game(agent_w, agent_b, fen)
     game.play()
 

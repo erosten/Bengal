@@ -1,9 +1,9 @@
 from src.game import Game
-from src.agents import RandomAgent, MinMaxAlphaBetaAgent
+from src.agents import NegaMax, AlphaBetaTTQ, Random
 def run_game(fen: str):
     try:
-        agent_w = RandomAgent()
-        agent_b = MinMaxAlphaBetaAgent(depth=10)
+        agent_w = Random()
+        agent_b = AlphaBetaTTQ(depth=10)
         game = Game(agent_w, agent_b, fen)
         game.play()
     except KeyboardInterrupt:

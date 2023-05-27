@@ -2128,70 +2128,98 @@ class Board(BaseBoard):
 
     # a bit more optimal than the python-chess version
     # by avoiding utility functions for castle hashing
-    def generate_non_qs_moves(self, from_mask: Bitboard = BB_ALL, to_mask: Bitboard = BB_ALL, king_mask = BB_EMPTY) -> Iterator[Move]:
-        
+    def generate_non_qs_moves(self, from_mask: Bitboard = BB_ALL, to_mask: Bitboard = BB_ALL, king_mask = BB_EMPTY) -> Iterator[Move]: 
         our_pieces = self.occupied_co[self.turn]
         enemy_pieces = self.occupied_co[not self.turn] & to_mask
 
-
-
         # pawn captures that are not pawns
-        pawns = self.pawns & our_pieces & from_mask
+        pawns = self.pawns & our_pieces 
+
         for from_square in scan_reversed(pawns):
-            targets = (
-                BB_PAWN_ATTACKS[self.turn][from_square] &
-                self.occupied_co[not self.turn] & to_mask)
+            pawn_att_mask = BB_PAWN_ATTACKS[self.turn][from_square]
 
-            for to_square in scan_reversed(targets):
-                # promotion captures
-                if square_rank(to_square) in [0, 7]:
-                    yield Move(from_square, to_square, QUEEN)
-                    yield Move(from_square, to_square, ROOK)
-                    yield Move(from_square, to_square, BISHOP)
-                    yield Move(from_square, to_square, KNIGHT)
-                else:
-                    yield Move(from_square, to_square)
+            for piece_mask in [self.queens, self.rooks, self.bishops, self.knights]:
+                targets = pawn_att_mask & enemy_pieces & piece_mask
 
-        # other captures
+                for to_square in scan_reversed(targets):
+                    # keep track if they check and remove from possible checkers
+                    # promotion captures
+                    if square_rank(to_square) in [0, 7]:
+                        yield Move(from_square, to_square, QUEEN)
+                        yield Move(from_square, to_square, ROOK)
+                        yield Move(from_square, to_square, BISHOP)
+                        yield Move(from_square, to_square, KNIGHT)
+                    else:
+                        yield Move(from_square, to_square)
+
+        # winning captures, capturer > value than captured
         # from most -> least valuable victim
         # so in reverse is least valuable attacker 
         # skips pawns as attackers (covered above)
         # skips kings as victims
-        pieces = [self.kings, self.queens, self.rooks, self.bishops, self.knights, self.pawns]
-        for i in range(1,6):
+        pieces = [self.queens, self.rooks, self.bishops, self.knights, self.pawns]
+        for i in range(5):
             vics = pieces[i] & enemy_pieces
             if not vics:
                 continue
             for j in range(len(pieces)-2,-1,-1):
-                atters = pieces[j] & from_mask & our_pieces
+                # winning captures first
+                if j<=i:
+                    break
+                atters = pieces[j] & our_pieces
                 for a in scan_reversed(atters):
                     att_vics = self.attacks_mask(a) & vics
                 
                     for v in scan_reversed(att_vics):
                         assert self.is_capture(Move(a, v))
 
-                        yield Move(a, v)                     
+                        yield Move(a, v)                    
+
+        # even captures
+        # q,r,b,n, p
+        for i in range(5):
+            vics = pieces[i] & enemy_pieces
+            atters = pieces[i] & our_pieces
+            for a in scan_reversed(atters):
+                att_vics = self.attacks_mask(a) & vics
+            
+                for v in scan_reversed(att_vics):
+                    assert self.is_capture(Move(a, v))
+
+                    yield Move(a, v)           
+        
+        # losing captures
+        pieces = [self.queens, self.rooks, self.bishops, self.knights, self.pawns]
+        for i in range(5):
+            vics = pieces[i] & enemy_pieces
+            if not vics:
+                continue
+            for j in range(i):
+                atters = pieces[j] & our_pieces
+                for a in scan_reversed(atters):
+                    att_vics = self.attacks_mask(a) & vics
+                
+                    for v in scan_reversed(att_vics):
+                        assert self.is_capture(Move(a, v))
+
+                        yield Move(a, v)          
 
         # king captures
-        vics = self.kings & enemy_pieces
-        if vics:
-            for j in range(len(pieces)-1,-1,-1):
-                atters = pieces[j] & from_mask & our_pieces
-                for a in scan_reversed(atters):
-                    att_vics = self.attacks_mask(a) & vics
-                
-                    for v in scan_reversed(att_vics):
-                        assert self.is_capture(Move(a, v))
+        atters = self.kings & our_pieces
+        pieces = [self.queens, self.rooks, self.bishops, self.knights, self.pawns]
+        for i in range(5):
+            vics = pieces[i] & enemy_pieces
+            if not vics:
+                continue
+            for a in scan_reversed(atters):
+                att_vics = self.attacks_mask(a) & vics
+            
+                for v in scan_reversed(att_vics):
+                    assert self.is_capture(Move(a, v))
 
-                        yield Move(a, v)        
-    
+                    yield Move(a, v)   
 
-    def generate_sorted_moves_last(self, m: Move, from_mask = BB_ALL, to_mask = BB_ALL) -> Iterator[Move]:
-        if m != Move.null():
-            yield m
-        yield from self.generate_sorted_moves(last_move = Move.null(), from_mask=from_mask^BB_SQUARES[m.from_square], to_mask=to_mask^BB_SQUARES[m.to_square])
-
-    def generate_sorted_moves(self, last_move: Move = Move.null(), from_mask = BB_ALL, to_mask = BB_ALL) -> Iterator[Move]:
+    def generate_sorted_moves(self, from_mask = BB_ALL, to_mask = BB_ALL) -> Iterator[Move]:
 
         king_mask = self.kings & self.occupied_co[self.turn]
         if king_mask:
@@ -2203,15 +2231,10 @@ class Board(BaseBoard):
                     if self._is_safe(king, blockers, move):
                         yield move
             else:
-                if last_move and last_move != Move.null():
-                    if self._is_safe(king, blockers, last_move):
-                        yield last_move
                 for move in self.generate_sorted_pseudo_legal_moves(from_mask, to_mask):
                     if self._is_safe(king, blockers, move):
                         yield move
         else:
-            if last_move and last_move != Move.null():
-                yield last_move
             yield from self.generate_sorted_pseudo_legal_moves(from_mask, to_mask)
 
     def king_checking_mask(self, color: Color, king: Square):
@@ -2234,61 +2257,106 @@ class Board(BaseBoard):
     # Moving a piece that is blocking a checked king
     # En passant that moves out of a pin on king (some other stuff maybe?)
     def generate_sorted_pseudo_legal_moves(self, from_mask: Bitboard = BB_ALL, to_mask: Bitboard = BB_ALL) -> Iterator[Move]:
-        our_pieces = self.occupied_co[self.turn]
+        our_pieces = self.occupied_co[self.turn] & from_mask
         enemy_pieces = self.occupied_co[not self.turn] & to_mask
 
-
-
         # pawn captures that are not pawns
-        pawns = self.pawns & our_pieces & from_mask
+        pawns = self.pawns & our_pieces 
+
         for from_square in scan_reversed(pawns):
-            targets = (
-                BB_PAWN_ATTACKS[self.turn][from_square] &
-                self.occupied_co[not self.turn] & to_mask)
+            pawn_att_mask = BB_PAWN_ATTACKS[self.turn][from_square]
 
-            for to_square in scan_reversed(targets):
-                # keep track if they check and remove from possible checkers
-                # en passant captures
-                if square_rank(to_square) in [0, 7]:
-                    yield Move(from_square, to_square, QUEEN)
-                    yield Move(from_square, to_square, ROOK)
-                    yield Move(from_square, to_square, BISHOP)
-                    yield Move(from_square, to_square, KNIGHT)
-                else:
-                    yield Move(from_square, to_square)
+            for piece_mask in [self.queens, self.rooks, self.bishops, self.knights]:
+                targets = pawn_att_mask & enemy_pieces & piece_mask
 
-        # other captures
+                for to_square in scan_reversed(targets):
+                    # keep track if they check and remove from possible checkers
+                    # promotion captures
+                    if square_rank(to_square) in [0, 7]:
+                        yield Move(from_square, to_square, QUEEN)
+                        yield Move(from_square, to_square, ROOK)
+                        yield Move(from_square, to_square, BISHOP)
+                        yield Move(from_square, to_square, KNIGHT)
+                    else:
+                        yield Move(from_square, to_square)
+
+        # winning captures, capturer > value than captured
         # from most -> least valuable victim
         # so in reverse is least valuable attacker 
         # skips pawns as attackers (covered above)
         # skips kings as victims
-        pieces = [self.kings, self.queens, self.rooks, self.bishops, self.knights, self.pawns]
-        for i in range(1,6):
+        pieces = [self.queens, self.rooks, self.bishops, self.knights, self.pawns]
+        for i in range(5):
             vics = pieces[i] & enemy_pieces
             if not vics:
                 continue
             for j in range(len(pieces)-2,-1,-1):
-                atters = pieces[j] & from_mask & our_pieces
+                # winning captures first
+                if j<=i:
+                    break
+                atters = pieces[j] & our_pieces
                 for a in scan_reversed(atters):
                     att_vics = self.attacks_mask(a) & vics
                 
                     for v in scan_reversed(att_vics):
                         assert self.is_capture(Move(a, v))
 
-                        yield Move(a, v)                     
+                        yield Move(a, v)                    
+
+        # even captures
+        # q,r,b,n, p
+        for i in range(5):
+            vics = pieces[i] & enemy_pieces
+            atters = pieces[i] & our_pieces
+            for a in scan_reversed(atters):
+                att_vics = self.attacks_mask(a) & vics
+            
+                for v in scan_reversed(att_vics):
+                    assert self.is_capture(Move(a, v))
+
+                    yield Move(a, v)           
+        
+        # losing captures
+        pieces = [self.queens, self.rooks, self.bishops, self.knights, self.pawns]
+        for i in range(5):
+            vics = pieces[i] & enemy_pieces
+            if not vics:
+                continue
+            for j in range(i):
+                atters = pieces[j] & our_pieces
+                for a in scan_reversed(atters):
+                    att_vics = self.attacks_mask(a) & vics
+                
+                    for v in scan_reversed(att_vics):
+                        assert self.is_capture(Move(a, v))
+
+                        yield Move(a, v)          
 
         # king captures
-        vics = self.kings & enemy_pieces
-        if vics:
-            for j in range(len(pieces)-1,-1,-1):
-                atters = pieces[j] & from_mask & our_pieces
-                for a in scan_reversed(atters):
-                    att_vics = self.attacks_mask(a) & vics
-                
-                    for v in scan_reversed(att_vics):
-                        assert self.is_capture(Move(a, v))
+        atters = self.kings & our_pieces
+        pieces = [self.queens, self.rooks, self.bishops, self.knights, self.pawns]
+        for i in range(5):
+            vics = pieces[i] & enemy_pieces
+            if not vics:
+                continue
+            for a in scan_reversed(atters):
+                att_vics = self.attacks_mask(a) & vics
+            
+                for v in scan_reversed(att_vics):
+                    assert self.is_capture(Move(a, v))
 
-                        yield Move(a, v)               
+                    yield Move(a, v)   
+
+
+        # pawn capturing pawns
+        # pawn captures that are not pawns
+        # pawns = self.pawns & our_pieces & from_mask
+        # for from_square in scan_reversed(pawns):
+        #     targets = (BB_PAWN_ATTACKS[self.turn][from_square] & self.occupied_co[not self.turn] & self.pawns)
+        #     for to_square in scan_reversed(targets):
+        #         assert square_rank(to_square) not in [0, 7]
+        #         yield Move(from_square, to_square)
+
         # Generate en passants captures (other than en passants)
         if self.ep_square:
             yield from self.generate_pseudo_legal_ep(from_mask, to_mask)
