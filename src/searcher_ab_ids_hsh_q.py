@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Optional
 from loguru import logger
 import os, sys
 from collections import defaultdict
@@ -12,7 +12,7 @@ from tabulate import tabulate
 
 NULL_MOVE = Move.null()
 
-BOOK_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'books/bin/Cerebellum_Light_Poly.bin')
+DEFAULT_BOOK_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'books/bin/Cerebellum_Light_Poly.bin')
 BOOK_SCORE = 1337
 
 
@@ -25,10 +25,18 @@ def wrap_gen_insert_move(gen, initial_move):
 
 class Searcher:
 
-    def __init__(self):
+    def __init__(self, book_path: Optional[str] = None):
 
         # books
-        self.book_op = open_reader(BOOK_PATH)
+        if book_path:
+            self.book_op = open_reader(book_path)
+        else:
+            try:
+                self.book_op = open_reader(DEFAULT_BOOK_PATH)
+            except Exception:
+                logger.warning(f'Couldnt find default opening book {DEFAULT_BOOK_PATH}, proceeding without')
+                self.book_op = None
+
 
 
     def find_move(self, board: BoardT, depth: int) -> Move:
@@ -74,7 +82,7 @@ class Searcher:
         score = 0
         
         # Try to find a book move
-        entry = self.book_op.get(board)
+        entry = None if not self.book_op else self.book_op.get(board)
 
         if entry:
             self.nbook += 1
