@@ -1,7 +1,7 @@
 from loguru import logger
 
-from hueristic import evaluate, MATE_VALUE
-from board import BoardT, Move
+from .hueristic import evaluate, MATE_VALUE
+from .board import BoardT, Move
 
 
 class Searcher:

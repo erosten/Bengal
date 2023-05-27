@@ -5,7 +5,7 @@ p_to_src = os.path.abspath(os.path.dirname(thisdir))
 sys.path.append(p_to_src)
 from src.searcher_ab_ids_hsh_q import Searcher as ABTTQSearcher
 from src.searcher_alphabeta import Searcher as ABSearcher
-from src.chess import Board, Move
+from src.board import Board, Move
 
 
 def test_mate_in_twos(fen_filter):

@@ -1,5 +1,5 @@
-from game import Game
-from agents import NegaMax, AlphaBetaTTQ, User
+from src.game import Game
+from src.agents import NegaMax, AlphaBetaTTQ, User
 
 def run_game(fen: str):
     agent_b = AlphaBetaTTQ(depth=5)

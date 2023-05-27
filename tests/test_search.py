@@ -8,7 +8,7 @@ sys.path.append(p_to_src)
 from src.searcher_negamax import Searcher
 from src.searcher_alphabeta import Searcher as ABSearcher
 # from src.pv_searcher import PrincipalVariationSearcher as PVSearcher
-from src.chess import Board
+from src.board import Board
 from src.utils import display
 from src.searcher_ab_ids_hsh_q import Searcher as ABTTQSearcher
 import time

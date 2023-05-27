@@ -3,7 +3,7 @@ import sys, os
 p_to_src = os.path.abspath(os.path.dirname(os.path.abspath('')))
 sys.path.append(p_to_src)
 
-from src.chess import Board
+from src.board import Board
 
 def perft_test(depth: int, board: Board) -> int:
     if depth >= 1:

@@ -4,16 +4,15 @@ import os, sys
 from collections import defaultdict
 logger.remove()
 logger.add(sys.stderr, level="DEBUG")
-from hueristic import evaluate, MATE_VALUE
-from board import BoardT, Move
+from .hueristic import evaluate, MATE_VALUE
+from .board import BoardT, Move
 from chess.polyglot import open_reader
-from chess.engine import Limit
 import time
 from tabulate import tabulate
 
 NULL_MOVE = Move.null()
 
-DEFAULT_BOOK_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'books/bin/Cerebellum_Light_Poly.bin')
+BOOK_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'books/bin/Cerebellum_Light_Poly.bin')
 BOOK_SCORE = 1337
 
 
@@ -26,14 +25,11 @@ def wrap_gen_insert_move(gen, initial_move):
 
 class Searcher:
 
-    def __init__(self, book_path: str = DEFAULT_BOOK_PATH):
+    def __init__(self):
 
         # books
-        self.book_op = open_reader(book_path)
+        self.book_op = open_reader(BOOK_PATH)
 
-
-    def set_limit(self, limit: Limit):
-        self.limit = limit
 
     def find_move(self, board: BoardT, depth: int) -> Move:
         score, pv = self._search_at_depth(board, depth)
@@ -97,7 +93,7 @@ class Searcher:
             
             
             # if depth == 1:
-            score, move = self.alphabeta_tt(board, d, can_null=True, ply=0)
+            score, move = self.alphabeta_tt(board, d, can_null=can_null, ply=0)
             # else:
             #     # we tried aspiration window
             #     if score >= beta: # increase beta 
@@ -160,8 +156,7 @@ class Searcher:
             ply: int,
     ):
         stand_pat = evaluate(board, ply)
-        if depth > 0: # dont count frontier nodes
-            self.qnodes += 1
+        self.qnodes += 1
         if stand_pat >= beta:
             return stand_pat
         alpha = max(alpha, stand_pat)
@@ -176,8 +171,6 @@ class Searcher:
 
             if score >= beta:
                 return score
-        if NULL_MOVE in board.move_stack:
-            assert abs(alpha) != float('inf'), f'{score}, {stand_pat}, {alpha}, {beta}'
         return alpha
 
     def update_pv(self, move, ply):
@@ -214,9 +207,8 @@ class Searcher:
 
 
         # Quiesce at depth = 0
-        if depth <= 0:                
+        if depth == 0:                
             score = self.quiesce(board, 0, alpha, beta, ply)
-            assert abs(score) != float('inf')
             return score, NULL_MOVE
 
 
@@ -305,41 +297,29 @@ class Searcher:
         # Null Move Pruning
         # If we are in zugzwang, this is mistake
         # so check there is at least one major piece on the board
-        tried_null = False
-        if dist_fr_root > 0 and depth >= 3 and can_null and not in_check \
-            and (board.occupied_co[board.turn] & ~board.pawns).bit_count() > 2 and last_move == None and \
-            beta != float('inf'):
-            tried_null = True
+        if dist_fr_root > 0 and depth > 3 and can_null and not in_check \
+            and (board.occupied_co[board.turn] & ~board.pawns).bit_count() > 2:
             self.nm_tried+=1
             board.push(NULL_MOVE)
-            # print('before', alpha, beta, -beta, -beta+1)
-            if alpha == -float('inf') and beta == float('inf'):
-                import pdb; pdb.set_trace()
-            null_score, _ = self.alphabeta_tt(board, depth-3, -beta, -beta+1, can_null=False, ply=ply+1)
-            null_score = -null_score  
-            # print('after',alpha, beta, -beta, -beta+1, null_score)
+            score, _ = self.alphabeta_tt(board, depth-1-2, -beta, -beta+1, False, ply)
+            score = -score  
             board.pop()
-            assert not abs(null_score) == float('inf')
 
-            if null_score >= beta:
+            if score >= beta:
                 self.nm += 1
-                # if score > beta:
-                if not self.tt_score.get(z_hash) or depth >= self.tt_score[z_hash][1]:
 
-                    self.tt_score[z_hash] = (depth, 0, null_score, NULL_MOVE) # lower bound
-                # import pdb; pdb.set_trace()
-                return null_score, NULL_MOVE
+                if ply > 0:
+                    self.tt_score[z_hash] = (depth, 0, score, NULL_MOVE) # lower bound
+                    return score, NULL_MOVE
 
         # Did not prune, do a normal search                
         for move in move_gen:
             found=True
-            
             board.push(move)
-            
+
             score, _ = self.alphabeta_tt(board, depth-1, -beta, -alpha, can_null, ply+1)
             score = -score
             board.pop()
-
 
             if score > best:
                 best = score
@@ -368,17 +348,11 @@ class Searcher:
                     self.killers[ply].append(best_move)
             
             # if no entry or this depth is less or eq to existing
-            if not self.tt_score.get(z_hash) or depth >= self.tt_score[z_hash][1]:
-                if best == float('inf'):
-                    import pdb; pdb.set_trace()
+            if not self.tt_score.get(z_hash) or depth <= self.tt_score[z_hash][1]:
                 self.tt_score[z_hash] = (depth, flag, best, best_move)
-
-            if tried_null and abs(best) == float('inf'):
-                import pdb; pdb.set_trace()
 
             return best, best_move
         else:
-
             if board.is_check():
                 # + ply prioritizes shorter checkmates
                 return -MATE_VALUE + ply, NULL_MOVE
