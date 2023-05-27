@@ -17,7 +17,7 @@ from tqdm import tqdm
 import tabulate
 
 def load_data():
-   with open(os.path.join(thisdir, 'search_test_data.json'), 'r') as f:
+   with open(os.path.join(thisdir, './data/search_test_data.json'), 'r') as f:
       return json.load(f)
 
 
