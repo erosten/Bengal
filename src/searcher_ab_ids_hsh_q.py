@@ -147,13 +147,12 @@ class Searcher:
                     headers = labels,
                     tablefmt = 'grid'
                 )
+            # Principal Variation
+            self.pv = [m for m in self.pv_table[0] if m != 0] 
             logger.debug('\n' + table)
+            logger.success(f'PV: {self.pv}')
 
-
-        # Principal Variation
-        self.pv = [m for m in self.pv_table[0] if m != 0] 
-        logger.success(f'PV: {self.pv}')
-        return score, self.pv
+            yield score, self.pv
 
     def quiesce(
             self,
