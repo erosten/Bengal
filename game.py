@@ -1,8 +1,8 @@
 import chess.pgn
-from .agents import Agent, Random, User
-from .hueristic import evaluate
-from .chess import Board
-from .utils import display
+from agents import Agent, Random, User
+from hueristic import evaluate
+from board import Board
+from utils import display
 
 
 class Game:

@@ -1,11 +1,11 @@
-from .chess import PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING
-from .chess import WHITE, BLACK, COLORS, PIECE_TYPES, Color
-from .chess import scan_reversed, square_file, square_rank
-from .chess import BoardT
-from .chess import Square, SquareSet, BB_FILES
-from .chess import shift_up, shift_down, shift_up_right, shift_up_left
-from .chess import shift_down_right, shift_down_left, shift_right, shift_left
-from .piece_square_tables import MG_TABLE, EG_TABLE, MG_TABLE_W, EG_TABLE_W
+from board import PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING
+from board import WHITE, BLACK, COLORS, PIECE_TYPES, Color
+from board import scan_reversed, square_file, square_rank
+from board import BoardT
+from board import Square, SquareSet, BB_FILES
+from board import shift_up, shift_down, shift_up_right, shift_up_left
+from board import shift_down_right, shift_down_left, shift_right, shift_left
+from piece_square_tables import MG_TABLE, EG_TABLE, MG_TABLE_W, EG_TABLE_W
 
 # need to change later maybe
 Us = 'US'
@@ -74,9 +74,7 @@ def evaluate(board: BoardT, ply: int = 0, verbose: bool = False) -> float:
             # get counts and increment game phase
             p_type_idx = p_type-1
             cnt = 0
-            # cnt = pcs.bit_count()
-            # counts[c].append(cnt)
-
+            
             # pst stuff
             for pc in scan_reversed(pcs):
                 cnt += 1

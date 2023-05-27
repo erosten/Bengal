@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 import random
 
-from .searcher_negamax import Searcher as NegaMaxSearcher
-from .searcher_alphabeta import Searcher as AlphaBetaSearcher
-from .searcher_ab_ids_hsh_q import Searcher as QABTTSearcher
-from .chess import BoardT, Move
+from searcher_negamax import Searcher as NegaMaxSearcher
+from searcher_alphabeta import Searcher as AlphaBetaSearcher
+from searcher_ab_ids_hsh_q import Searcher as QABTTSearcher
+from board import BoardT, Move
 
 class Agent(ABC):
     @abstractmethod

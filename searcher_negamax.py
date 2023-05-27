@@ -1,9 +1,11 @@
 from loguru import logger
 
-from .hueristic import evaluate, MATE_VALUE
-from .chess import BoardT, Move
 
+from hueristic import evaluate, MATE_VALUE
+from board import BoardT, Move
 
+NULL_MOVE = Move.null()
+# minimal negamax searcher
 class Searcher:
 
     def __init__(self):
@@ -22,30 +24,25 @@ class Searcher:
 
         best_move = Move.null()
         best = -float('inf')
-        alpha = -float('inf')
-        beta = float('inf')
 
         for move in board.generate_sorted_moves():
             board.push(move)
-            score = -self.alphabeta(board, depth-1, -beta, -alpha)
+            score = -self.negamax(board, depth-1)
             board.pop()
             # print('final', move, score, best)
             if score > best:
                 best = score
                 best_move = move
-            alpha = max(score, alpha)
 
         assert best_move != Move.null()
         if not board.turn: # return eval from white's perspective
             best = - best
         return best, best_move
 
-    def alphabeta(
+    def negamax(
             self, 
             board: BoardT, 
             depth: int,
-            alpha: int = -float('inf'),
-            beta:  int = float('inf')
         ):
 
 
@@ -57,38 +54,22 @@ class Searcher:
         else:
             best = -float('inf')
             found=False
-            b = beta
-            x=False
             for move in board.generate_sorted_moves():
                 found=True
 
                 board.push(move)
-                # prune null moves
-                if depth > 3 and move == Move.null():
-                    score = self.alphabeta(board, depth-2, alpha, beta)
-                    print('i hoep u dont see me')
-                    # if score is better for opponent, return 
-                    # if 
-                    # if score < beta, failed 
-                else:
-                    score = -self.alphabeta(board, depth-1, -beta, -alpha)
+                score = -self.negamax(board, depth-1)
                     
 
                 board.pop()
                 best = max(best, score)
-                alpha = max(score, alpha)
-
-                if alpha >= beta:
-                    # if depth == 5:
-                    #     print('cutoff', alpha, beta, best)
-                    return best
 
             if found:
                 return best
             else:
                 if board.is_check(): # mate
                     # return ply - MATE_VALUE, NULL_MOVE
-                    return MATE_VALUE if board.turn else -MATE_VALUE,
+                    return MATE_VALUE if board.turn else -MATE_VALUE
 
                 else:
                     return 0 # stalemate
