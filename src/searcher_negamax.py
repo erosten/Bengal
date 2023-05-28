@@ -1,13 +1,13 @@
 from loguru import logger
 
-
-from .hueristic import evaluate, MATE_VALUE
 from .board import BoardT, Move
+from .hueristic import MATE_VALUE, evaluate
 
 NULL_MOVE = Move.null()
+
+
 # minimal negamax searcher
 class Searcher:
-
     def __init__(self):
         pass
 
@@ -27,7 +27,7 @@ class Searcher:
 
         for move in board.generate_sorted_moves():
             board.push(move)
-            score = -self.negamax(board, depth-1)
+            score = -self.negamax(board, depth - 1)
             board.pop()
             # print('final', move, score, best)
             if score > best:
@@ -35,16 +35,15 @@ class Searcher:
                 best_move = move
 
         assert best_move != Move.null()
-        if not board.turn: # return eval from white's perspective
-            best = - best
+        if not board.turn:  # return eval from white's perspective
+            best = -best
         return best, best_move
 
     def negamax(
-            self, 
-            board: BoardT, 
-            depth: int,
-        ):
-
+        self,
+        board: BoardT,
+        depth: int,
+    ):
 
         if depth == 0:
             score = evaluate(board)
@@ -53,13 +52,12 @@ class Searcher:
 
         else:
             best = -float('inf')
-            found=False
+            found = False
             for move in board.generate_sorted_moves():
-                found=True
+                found = True
 
                 board.push(move)
-                score = -self.negamax(board, depth-1)
-                    
+                score = -self.negamax(board, depth - 1)
 
                 board.pop()
                 best = max(best, score)
@@ -67,9 +65,9 @@ class Searcher:
             if found:
                 return best
             else:
-                if board.is_check(): # mate
+                if board.is_check():  # mate
                     # return ply - MATE_VALUE, NULL_MOVE
                     return MATE_VALUE if board.turn else -MATE_VALUE
 
                 else:
-                    return 0 # stalemate
+                    return 0  # stalemate

@@ -1,20 +1,22 @@
 def display(board):
 
-        # def print_board(self, board_state, captured={"w": [], "b": []}):
+    # def print_board(self, board_state, captured={"w": [], "b": []}):
 
     print('\n------------------------------------------------------------------\n')
-    PIECE_SYMBOLS = {'P': '♟',
-                    'B': '♝',
-                    'N': '♞',
-                    'R': '♜',
-                    'Q': '♛',
-                    'K': '♚',
-                    'p': '\033[36m\033[1m♙\033[0m',
-                    'b': '\033[36m\033[1m♗\033[0m',
-                    'n': '\033[36m\033[1m♘\033[0m',
-                    'r': '\033[36m\033[1m♖\033[0m',
-                    'q': '\033[36m\033[1m♕\033[0m',
-                    'k': '\033[36m\033[1m♔\033[0m'}
+    PIECE_SYMBOLS = {
+        'P': '♟',
+        'B': '♝',
+        'N': '♞',
+        'R': '♜',
+        'Q': '♛',
+        'K': '♚',
+        'p': '\033[36m\033[1m♙\033[0m',
+        'b': '\033[36m\033[1m♗\033[0m',
+        'n': '\033[36m\033[1m♘\033[0m',
+        'r': '\033[36m\033[1m♖\033[0m',
+        'q': '\033[36m\033[1m♕\033[0m',
+        'k': '\033[36m\033[1m♔\033[0m',
+    }
 
     board_state = board.fen()
 
@@ -24,7 +26,7 @@ def display(board):
     black_captured = " ".join(PIECE_SYMBOLS[piece] for piece in [])
     # import pdb; pdb.set_trace()
     for i, row in enumerate(board_state):
-        board_state_str += str(8-i)
+        board_state_str += str(8 - i)
         for char in row:
             if char.isdigit():
                 board_state_str += " ♢" * int(char)

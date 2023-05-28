@@ -1,10 +1,12 @@
-from abc import ABC, abstractmethod
 import random
+from abc import ABC, abstractmethod
 
-from .searcher_negamax import Searcher as NegaMaxSearcher
-from .searcher_alphabeta import Searcher as AlphaBetaSearcher
-from .searcher_ab_ids_hsh_q import Searcher as QABTTSearcher
 from .board import BoardT, Move
+from .searcher_ab_ids_hsh_q import Searcher as QABTTSearcher
+from .searcher_alphabeta import Searcher as AlphaBetaSearcher
+from .searcher_negamax import Searcher as NegaMaxSearcher
+from .searcher_pvs import Searcher as PVSearcher
+
 
 class Agent(ABC):
     @abstractmethod
@@ -16,13 +18,13 @@ def get_user_move(board: BoardT) -> str:
     user_input = input('Make a move: \033[95m')
 
     print("\033[0m")
-    have_valid_move = False if user_input.lower() != 'ff' else True 
+    have_valid_move = False if user_input.lower() != 'ff' else True
     while not have_valid_move:
         try:
             user_move = Move.from_uci(user_input)
 
             if user_move not in list(board.legal_moves):
-                print(f'That move is not legal')
+                print('That move is not legal')
                 user_input = input('Please enter a valid move:')
                 continue
 
@@ -32,22 +34,23 @@ def get_user_move(board: BoardT) -> str:
             continue
 
         have_valid_move = True
-    
+
     return user_input
+
 
 def get_random_move(board: BoardT) -> str:
     legal_moves = list(board.legal_moves)
-    return legal_moves[random.randint(0, len(legal_moves)-1)].uci()
+    return legal_moves[random.randint(0, len(legal_moves) - 1)].uci()
 
 
 class Random:
     def __init__(self, seed: int = 42):
-        self.seed = seed  
+        self.seed = seed
 
     def get_move(self, board: BoardT) -> str:
         random.seed(self.seed)
         return get_random_move(board)
-    
+
 
 class User:
     def get_move(self, board: BoardT) -> str:
@@ -60,19 +63,21 @@ class NegaMax:
         self.searcher = NegaMaxSearcher()
 
     def get_move(self, board: BoardT) -> str:
-        ai_move = self.searcher.find_move(board, depth = self.depth)
-        
+        ai_move = self.searcher.find_move(board, depth=self.depth)
+
         return ai_move.uci()
 
-class AlphaBeta: # Negamax
+
+class AlphaBeta:  # Negamax
     def __init__(self, depth: int = 3):
         self.depth = depth
         self.searcher = AlphaBetaSearcher()
 
     def get_move(self, board: BoardT) -> str:
-        ai_move = self.searcher.find_move(board, depth = self.depth)
-        
+        ai_move = self.searcher.find_move(board, depth=self.depth)
+
         return ai_move.uci()
+
 
 class AlphaBetaTTQ:
     def __init__(self, depth: int = 3):
@@ -80,17 +85,16 @@ class AlphaBetaTTQ:
         self.searcher = QABTTSearcher()
 
     def get_move(self, board: BoardT) -> str:
-        ai_move = self.searcher.find_move(board, depth = self.depth)
-        
+        ai_move = self.searcher.find_move(board, depth=self.depth)
+
         return ai_move
 
 
-# class PrincipalVariation:
-#     def __init__(self, depth: int = 3):
-#         self.depth = depth
-#         self.searcher = PVSearcher()
+class PrincipalVariation:
+    def __init__(self, depth: int = 3):
+        self.depth = depth
+        self.searcher = PVSearcher()
 
-#     def get_move(self, board: BoardT) -> str:
-#         ai_move = self.searcher.find_move(board, depth = self.depth)
-        
-#         return ai_move.uci()
+    def get_move(self, board: BoardT) -> str:
+        score, pv = self.searcher.find_move(board, self.depth)
+        return pv[0]

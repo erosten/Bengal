@@ -1,11 +1,10 @@
 from loguru import logger
 
-from .hueristic import evaluate, MATE_VALUE
 from .board import BoardT, Move
+from .hueristic import MATE_VALUE, evaluate
 
 
 class Searcher:
-
     def __init__(self):
         pass
 
@@ -27,7 +26,7 @@ class Searcher:
 
         for move in board.generate_sorted_moves():
             board.push(move)
-            score = -self.alphabeta(board, depth-1, -beta, -alpha)
+            score = -self.alphabeta(board, depth - 1, -beta, -alpha)
             board.pop()
             # print('final', move, score, best)
             if score > best:
@@ -36,18 +35,11 @@ class Searcher:
             alpha = max(score, alpha)
 
         assert best_move != Move.null()
-        if not board.turn: # return eval from white's perspective
-            best = - best
+        if not board.turn:  # return eval from white's perspective
+            best = -best
         return best, best_move
 
-    def alphabeta(
-            self, 
-            board: BoardT, 
-            depth: int,
-            alpha: int = -float('inf'),
-            beta:  int = float('inf')
-        ):
-
+    def alphabeta(self, board: BoardT, depth: int, alpha: int = -float('inf'), beta: int = float('inf')):
 
         if depth == 0:
             score = evaluate(board)
@@ -56,23 +48,20 @@ class Searcher:
 
         else:
             best = -float('inf')
-            found=False
-            b = beta
-            x=False
+            found = False
             for move in board.generate_sorted_moves():
-                found=True
+                found = True
 
                 board.push(move)
                 # prune null moves
                 if depth > 3 and move == Move.null():
-                    score = self.alphabeta(board, depth-2, alpha, beta)
+                    score = self.alphabeta(board, depth - 2, alpha, beta)
                     print('i hoep u dont see me')
-                    # if score is better for opponent, return 
-                    # if 
-                    # if score < beta, failed 
+                    # if score is better for opponent, return
+                    # if
+                    # if score < beta, failed
                 else:
-                    score = -self.alphabeta(board, depth-1, -beta, -alpha)
-                    
+                    score = -self.alphabeta(board, depth - 1, -beta, -alpha)
 
                 board.pop()
                 best = max(best, score)
@@ -86,9 +75,9 @@ class Searcher:
             if found:
                 return best
             else:
-                if board.is_check(): # mate
+                if board.is_check():  # mate
                     # return ply - MATE_VALUE, NULL_MOVE
-                    return MATE_VALUE if board.turn else -MATE_VALUE,
+                    return (MATE_VALUE if board.turn else -MATE_VALUE,)
 
                 else:
-                    return 0 # stalemate
+                    return 0  # stalemate

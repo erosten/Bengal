@@ -1,9 +1,11 @@
-import sys, os
+import os
+import sys
 
 p_to_src = os.path.abspath(os.path.dirname(os.path.abspath('')))
 sys.path.append(p_to_src)
 
 from src.board import Board
+
 
 def perft_test(depth: int, board: Board) -> int:
     if depth >= 1:
@@ -16,8 +18,9 @@ def perft_test(depth: int, board: Board) -> int:
 
         return count
     else:
-      return 1
-    
+        return 1
+
+
 def perft(depth: int, board: Board) -> int:
     if depth >= 1:
         count = 0
@@ -29,11 +32,14 @@ def perft(depth: int, board: Board) -> int:
 
         return count
     else:
-      return 1
+        return 1
 
-import time
+
 import json
+import time
+
 from tqdm import tqdm
+
 
 def test(fens):
     n1 = []
@@ -46,19 +52,21 @@ def test(fens):
 
         n1.append(pnodes)
         n2.append(pnodes2)
-    
+
     print('Reg ', n1)
     print('Test ', n2)
 
 
+from typing import List, Tuple
 
-from typing import Tuple, List
+
 def gen(additional_tests: List[Tuple[str, int]] = []):
     json_out = []
     n1 = []
     n2 = []
     from data.original_search_test_data import DATA
-    d = sorted(DATA, key = lambda x: x['depth'])
+
+    d = sorted(DATA, key=lambda x: x['depth'])
     for test in tqdm(d):
         if test['depth'] >= 4:
             break
@@ -72,51 +80,48 @@ def gen(additional_tests: List[Tuple[str, int]] = []):
         out['depth'] = d
         out['fen'] = fen
         b = Board(fen)
-        out['perft'] = perft(d,b)
+        out['perft'] = perft(d, b)
 
         t1 = time.time()
         n = perft_test(d, b)
-        t = time.time()-t1
+        t = time.time() - t1
         out['perft_time'] = t
         out['perft_nodes'] = n
         n2.append(n)
         json_out.append(out)
-    
 
-    
     # assumed no GT
     for (fen, d) in additional_tests:
         out = {}
         print(fen)
-        b=Board(fen)
+        b = Board(fen)
         t1 = time.time()
-        n = perft(d,b)
-        t = time.time()-t1
+        n = perft(d, b)
+        t = time.time() - t1
         out['nodes'] = n
         n1.append(n)
         out['depth'] = d
         out['fen'] = fen
         t1 = time.time()
-        n = perft_test(d,b)
-        t = time.time()-t1
+        n = perft_test(d, b)
+        t = time.time() - t1
         out['perft_time'] = t
         out['perft_nodes'] = n
         n2.append(n)
         json_out.append(out)
-        
 
     json_formatted_str = json.dumps(json_out, indent=2)
 
     print(json_formatted_str)
-    equal = [x == y for x,y in zip(n1, n2)]
+    equal = [x == y for x, y in zip(n1, n2)]
 
     print(f'Perft passing: {sum(equal)}/{len(n1)}')
-    import pdb; pdb.set_trace()
+    import pdb
+
+    pdb.set_trace()
 
 
-ADDITIONAL_DATA = [
-    ('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', 4)
-]
+ADDITIONAL_DATA = [('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', 4)]
 
 if __name__ == '__main__':
     gen(additional_tests=ADDITIONAL_DATA)

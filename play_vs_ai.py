@@ -1,5 +1,6 @@
+from src.agents import AlphaBetaTTQ, User
 from src.game import Game
-from src.agents import NegaMax, AlphaBetaTTQ, User
+
 
 def run_game(fen: str):
     agent_b = AlphaBetaTTQ(depth=5)
@@ -9,7 +10,8 @@ def run_game(fen: str):
 
     pgn = game.get_pgn()
     print(pgn)
-    
+
+
 if __name__ == '__main__':
     # Italian Game
     # fen = 'r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3'
@@ -19,9 +21,9 @@ if __name__ == '__main__':
     # fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
     # isolated pawns
-    #1
+    # 1
     # fen = '4k3/ppp2ppp/8/8/4P3/8/PPP3PP/4K3 w - - 0 1'
-    #2
+    # 2
     # fen = '3r1k2/2p2pbp/1p2p3/p5P1/3PBP2/6P1/6K1/7R w - - 0 1'
 
     # hanging queen - black to move

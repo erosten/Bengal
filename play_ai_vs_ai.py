@@ -1,5 +1,5 @@
+from src.agents import AlphaBetaTTQ
 from src.game import Game
-from src.agents import NegaMax, AlphaBetaTTQ, Random
 
 
 def run_game(fen: str):
@@ -14,7 +14,7 @@ def run_game(fen: str):
     pgn = game.get_pgn()
     print(pgn)
     # print(f'Total time thinking for W: {tot}')
-    
+
 
 if __name__ == '__main__':
     # Italian Game

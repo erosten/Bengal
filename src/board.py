@@ -81,6 +81,13 @@ STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 STARTING_BOARD_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
 """The board part of the FEN for the standard chess starting position."""
 
+"""Helpful Enums"""
+class MoveType(enum.Enum):
+    CAPTURE = 1
+    CHECK = 2
+    OTHER = 3
+    EP_CAPTURE = 4
+
 """For zobrist __hash__"""
 POLYGLOT_RANDOM_ARRAY = [
     0x9D39247E33776D41, 0x2AF7398005AAA5C7, 0x44DB015024623547, 0x9C15F73E62A76AE2,
@@ -2108,8 +2115,32 @@ class Board(BaseBoard):
                     self._attacked_for_king(king_to, self.occupied ^ king ^ rook ^ rook_to)):
                 yield self._from_chess960(self.chess960, msb(king), candidate)
 
+    def _generate_evasions_with_type(self, king: Square, checkers: Bitboard, from_mask: Bitboard = BB_ALL, to_mask: Bitboard = BB_ALL) -> Iterator[Move]:
+        sliders = checkers & (self.bishops | self.rooks | self.queens)
 
-    def generate_sorted_non_qs_moves(self, from_mask: Bitboard = BB_ALL, to_mask: Bitboard = BB_ALL) -> Iterator[Move]:
+        attacked = 0
+        for checker in scan_reversed(sliders):
+            attacked |= ray(king, checker) & ~BB_SQUARES[checker]
+
+        if BB_SQUARES[king] & from_mask:
+            for to_square in scan_reversed(BB_KING_ATTACKS[king] & ~self.occupied_co[self.turn] & ~attacked & to_mask):
+                yield Move(king, to_square), MoveType.CAPTURE
+
+        checker = msb(checkers)
+        if BB_SQUARES[checker] == checkers:
+            # Capture or block a single checker.
+            target = between(king, checker) | checkers
+
+            yield from self.generate_sorted_pseudo_legal_moves(~self.kings & from_mask, target & to_mask)
+
+            # Capture the checking pawn en passant (but avoid yielding
+            # duplicate moves).
+            if self.ep_square and not BB_SQUARES[self.ep_square] & target:
+                last_double = self.ep_square + (-8 if self.turn == WHITE else 8)
+                if last_double == checker:
+                    yield from self.generate_pseudo_legal_ep(from_mask, to_mask)
+
+    def generate_sorted_non_qs_moves(self, from_mask: Bitboard = BB_ALL, to_mask: Bitboard = BB_ALL) -> Iterator[Move, MoveType]:
         king_mask = self.kings & self.occupied_co[self.turn]
         if king_mask:
             king = msb(king_mask)
@@ -2118,11 +2149,11 @@ class Board(BaseBoard):
             if checkers:
                 for move in self._generate_evasions(king, checkers):
                     if self._is_safe(king, blockers, move):
-                        yield move
+                        yield move, MoveType.OTHER # TODO what to do here?
             else:
-                for move in self.generate_non_qs_moves(from_mask, to_mask, king_mask):
+                for move, typ in self.generate_non_qs_moves(from_mask, to_mask, king_mask):
                     if self._is_safe(king, blockers, move):
-                        yield move
+                        yield move, typ
         else:
             yield from self.generate_non_qs_moves(from_mask, to_mask)
 
@@ -2145,12 +2176,12 @@ class Board(BaseBoard):
                     # keep track if they check and remove from possible checkers
                     # promotion captures
                     if square_rank(to_square) in [0, 7]:
-                        yield Move(from_square, to_square, QUEEN)
-                        yield Move(from_square, to_square, ROOK)
-                        yield Move(from_square, to_square, BISHOP)
-                        yield Move(from_square, to_square, KNIGHT)
+                        yield Move(from_square, to_square, QUEEN), MoveType.CAPTURE
+                        yield Move(from_square, to_square, ROOK), MoveType.CAPTURE
+                        yield Move(from_square, to_square, BISHOP), MoveType.CAPTURE
+                        yield Move(from_square, to_square, KNIGHT), MoveType.CAPTURE
                     else:
-                        yield Move(from_square, to_square)
+                        yield Move(from_square, to_square), MoveType.CAPTURE
 
         # winning captures, capturer > value than captured
         # from most -> least valuable victim
@@ -2173,7 +2204,7 @@ class Board(BaseBoard):
                     for v in scan_reversed(att_vics):
                         assert self.is_capture(Move(a, v))
 
-                        yield Move(a, v)                    
+                        yield Move(a, v), MoveType.CAPTURE                    
 
         # even captures
         # q,r,b,n, p
@@ -2186,7 +2217,7 @@ class Board(BaseBoard):
                 for v in scan_reversed(att_vics):
                     assert self.is_capture(Move(a, v))
 
-                    yield Move(a, v)           
+                    yield Move(a, v), MoveType.CAPTURE           
         
         # losing captures
         pieces = [self.queens, self.rooks, self.bishops, self.knights, self.pawns]
@@ -2202,7 +2233,12 @@ class Board(BaseBoard):
                     for v in scan_reversed(att_vics):
                         assert self.is_capture(Move(a, v))
 
-                        yield Move(a, v)          
+                        yield Move(a, v), MoveType.CAPTURE    
+
+        # Generate en passants captures (other than en passants)
+        if self.ep_square:
+            for mv in self.generate_pseudo_legal_ep(from_mask, to_mask):
+                yield mv, MoveType.EP_CAPTURE
 
         # king captures
         atters = self.kings & our_pieces
@@ -2217,7 +2253,7 @@ class Board(BaseBoard):
                 for v in scan_reversed(att_vics):
                     assert self.is_capture(Move(a, v))
 
-                    yield Move(a, v)   
+                    yield Move(a, v), MoveType.CAPTURE   
 
     def generate_sorted_moves(self, from_mask = BB_ALL, to_mask = BB_ALL) -> Iterator[Move]:
 
@@ -2314,8 +2350,12 @@ class Board(BaseBoard):
                 for v in scan_reversed(att_vics):
                     assert self.is_capture(Move(a, v))
 
-                    yield Move(a, v)           
-        
+                    yield Move(a, v)  
+
+        # Generate en passants captures (other than en passants)
+        if self.ep_square:
+            yield from self.generate_pseudo_legal_ep(from_mask, to_mask)
+
         # losing captures
         pieces = [self.queens, self.rooks, self.bishops, self.knights, self.pawns]
         for i in range(5):
@@ -2347,19 +2387,6 @@ class Board(BaseBoard):
 
                     yield Move(a, v)   
 
-
-        # pawn capturing pawns
-        # pawn captures that are not pawns
-        # pawns = self.pawns & our_pieces & from_mask
-        # for from_square in scan_reversed(pawns):
-        #     targets = (BB_PAWN_ATTACKS[self.turn][from_square] & self.occupied_co[not self.turn] & self.pawns)
-        #     for to_square in scan_reversed(targets):
-        #         assert square_rank(to_square) not in [0, 7]
-        #         yield Move(from_square, to_square)
-
-        # Generate en passants captures (other than en passants)
-        if self.ep_square:
-            yield from self.generate_pseudo_legal_ep(from_mask, to_mask)
 
         # Generate moves from non captures
         # 1. Pawn promotions
@@ -2486,16 +2513,18 @@ class Board(BaseBoard):
                 king_cache.append((from_sq, to_sq))
                 # yield Move(from_sq, to_sq)
 
+        # # Generate castling moves.
+        if from_mask & self.kings:
+            yield from self.generate_castling_moves(from_mask, to_mask)
+
        # # Generate remaining non-capture, non-checking piece moves
-        for cache in [pawn_cache, knight_cache, bishop_cache, rook_cache, queen_cache, king_cache]:
+        for cache in [knight_cache, bishop_cache, rook_cache, queen_cache, pawn_cache, king_cache]:
             while cache:
                 fr, to = cache.pop()
                 yield Move(fr, to)
 
 
-        # # Generate castling moves.
-        if from_mask & self.kings:
-            yield from self.generate_castling_moves(from_mask, to_mask)
+
 
  
 

@@ -1,7 +1,8 @@
 import chess.pgn
+
 from .agents import Agent, Random, User
-from .hueristic import evaluate
 from .board import Board
+from .hueristic import evaluate
 from .utils import display
 
 
@@ -15,7 +16,7 @@ class Game:
             self.board = Board(chess.STARTING_FEN)
         else:
             self.board = Board(fen)
-        
+
         self.first = self.board.turn
         self.eval_log = []
         display(self.board)
@@ -24,13 +25,12 @@ class Game:
             raise AttributeError('Fen did not indicate WHITE to move but has been set has the user agent for input')
         elif isinstance(agent_b, User) and self.board.turn != chess.BLACK:
             raise AttributeError('Fen did not indicate BLACK to move but has been set as the user agent for input')
-        
 
     def eval(self):
         eval = evaluate(self.board)
         self.eval_log.insert(0, eval)
         return eval
-    
+
     def get_agent_move(self):
         if self.board.turn == chess.WHITE:
             return self.agent_w.get_move(self.board.copy())
@@ -38,22 +38,22 @@ class Game:
 
     def get_pgn(self):
         return chess.pgn.Game.from_board(self.board)
-    
+
     def save_evals(self):
         import matplotlib.pyplot as plt
+
         plys = [x for x in range(len(self.eval_log))]
 
         plt.plot(plys, self.eval_log)
         plt.xlabel('Ply')
         plt.ylabel('Eval Favoring White')
-        
-    
+
     def play(self):
         if self.done:
             print('Game is over, start another game.')
             return
-        
-        while not self.board.outcome(claim_draw = True):
+
+        while not self.board.outcome(claim_draw=True):
             turn_color = 'white' if self.board.turn == chess.WHITE else 'black'
             print(f'Current eval ({turn_color}\'s turn): {self.eval()}')
 
@@ -68,5 +68,3 @@ class Game:
         print(f'Game ended with {self.result.result()}, by {self.result.termination}, winner {self.result.winner}')
         self.done = True
         return
-
-        

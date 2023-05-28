@@ -1,5 +1,7 @@
+from src.agents import AlphaBetaTTQ, Random
 from src.game import Game
-from src.agents import NegaMax, AlphaBetaTTQ, Random
+
+
 def run_game(fen: str):
     try:
         agent_w = Random()
@@ -11,7 +13,7 @@ def run_game(fen: str):
 
     pgn = game.get_pgn()
     print(pgn)
-    
+
 
 if __name__ == '__main__':
     # Italian Game
