@@ -1,2 +1,3 @@
 from .src.board import *
-from .src.searcher_ab_ids_hsh_q import Searcher
+from .src.searcher_pvs import Searcher
+from .src.hueristic import evaluate

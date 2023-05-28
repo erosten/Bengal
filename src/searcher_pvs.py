@@ -223,8 +223,8 @@ class Searcher:
         # Quiesce at depth = 0
         if depth == 0:
             # only delta prune when a certain amount of pieces maybe?
-            # dp = True if self.ids_depth > 2 else False
-            score = self.quiesce(board, 0, alpha, beta, ply, dp=True)
+            dp = True if self.ids_depth > 2 else False
+            score = self.quiesce(board, 0, alpha, beta, ply, dp=dp)
             return score
 
         # Start to generate moves
@@ -335,7 +335,7 @@ class Searcher:
             board.push(move)
 
             # Futlity Pruning
-            if depth <= 2 and self.ids_depth > 3 and not in_check and not pv_node:
+            if depth <= 1 and self.ids_depth > 3 and not in_check and not pv_node:
                 eval = evaluate(board)
                 self.ftnodes_tried += 1
                 if eval - FUTILITY_MARGIN >= beta:
