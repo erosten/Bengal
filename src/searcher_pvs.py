@@ -55,7 +55,7 @@ class Searcher:
                 score = s
                 moves = m
                 if score == BOOK_SCORE:
-                    break
+                    return score, moves
         return score, moves
 
     # iterative depeening on search subroutine
@@ -95,6 +95,7 @@ class Searcher:
 
         if entry:
             self.nbook += 1
+            depth = -1
             yield BOOK_SCORE, [entry.move.uci()]
 
         for d in range(1, depth + 1):
@@ -177,7 +178,7 @@ class Searcher:
             if dp and move_type == MoveType.CAPTURE:
                 pieceval = MG_VALUE[board.piece_type_at(move.to_square) - 1]
                 self.dtnodes_tried += 1
-                if stand_pat < alpha - (pieceval - DELTA_PRUNE_SAFETY_MARGIN):
+                if stand_pat + (pieceval + DELTA_PRUNE_SAFETY_MARGIN) < alpha:
                     self.dtnodes += 1
                     continue
             board.push(move)

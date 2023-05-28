@@ -4,6 +4,8 @@ Notable changes to this project will be documented in this file.
 
 ## [0.0.2] - Search Improvements + More
 
+- Was undefeated in around 10 games against an 1800 rated human player in 30s games!
+
 ### Additional Features
 
 #### Search
