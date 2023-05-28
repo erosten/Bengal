@@ -54,6 +54,8 @@ class Searcher:
             if m:
                 score = s
                 moves = m
+                if score == BOOK_SCORE:
+                    break
         return score, moves
 
     # iterative depeening on search subroutine
