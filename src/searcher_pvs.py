@@ -22,7 +22,7 @@ BOOK_SCORE = 1337
 
 ''' TUNE '''
 DELTA_PRUNE_SAFETY_MARGIN = MG_VALUE[0] * 2
-FUTILITY_MARGIN = 300
+FUTILITY_MARGIN = 500
 ''' TUNE '''
 
 
@@ -78,7 +78,7 @@ class Searcher:
         self.kmoves_ill = 0
         self.pvs_research = 0
 
-        # tt table/PV/killer moves
+        # tt table/PV + killer/history hueristics
         self.tt_score = {}
         self.pv_length = [0 for _ in range(64)]
         self.pv_table = [[0 for _ in range(64)] for _ in range(64)]
@@ -208,9 +208,9 @@ class Searcher:
         self,
         board: BoardT,
         depth: int,
-        alpha: float = -float('inf'),  # best score ive gotten
-        beta: float = float('inf'),  # best score theyve gotten
-        can_null: bool = True,  # can make a null move?
+        alpha: float = -float('inf'),
+        beta: float = float('inf'),
+        can_null: bool = True,
         ply: int = 0,
         update_pv=True,
     ) -> Tuple[float, Move]:
@@ -233,7 +233,7 @@ class Searcher:
         # Start to generate moves
         # Moves are added FILO (First in Last out)
         # Although even last moves will go before any board generated moves
-        move_gen = board.generate_sorted_moves()
+        move_gen = board.generate_sorted_pseudo_legal_moves()
 
         # Killers
         if self.killers[ply]:
@@ -268,7 +268,7 @@ class Searcher:
                     move_gen = wrap_gen_insert_move(move_gen, tt_move)
 
             elif flag == 1:  # lower bound
-                if tt_score >= alpha:
+                if tt_score > alpha:
                     alpha = tt_score
                     # wrap gen does not handle nulls right now, so omit them
                     if update_pv and tt_move != NULL_MOVE:
@@ -318,10 +318,10 @@ class Searcher:
         ):
             self.nm_tried += 1
             board.push(NULL_MOVE)
-            score = -self.pvs(board, depth - 1 - 2, -beta, -beta + 90, False, ply, update_pv=False)
+            score = -self.pvs(board, depth - 1 - 2, -beta, -beta + 90, False, ply + 1, update_pv=False)
             board.pop()
 
-            if score >= beta:
+            if score > beta:  # if not strict, illegal move in 3s mate test #17
                 self.nm += 1
 
                 if ply > 0:
@@ -333,12 +333,13 @@ class Searcher:
         found_pv = False
         best = -float('inf')  # best score board.turn can get from this pos
         best_move = NULL_MOVE
+        move_gen = board.get_legal_generator(move_gen)
         for move in move_gen:
             found = True
             board.push(move)
 
             # Futlity Pruning
-            if depth <= 1 and self.ids_depth > 3 and not in_check and not pv_node:
+            if depth <= 2 and self.ids_depth > 3 and not in_check and not pv_node:
                 eval = evaluate(board)
                 self.ftnodes_tried += 1
                 if eval - FUTILITY_MARGIN >= beta:
@@ -346,9 +347,10 @@ class Searcher:
                     best = min(eval, beta)  # at some point should be eval?
                     self.ftnodes += 1
                     board.pop()
-                    break
+                    return best
 
             if found_pv:
+                # zero window search around pv to check if it is still pv
                 score = -self.pvs(board, depth - 1, -alpha - 90, -alpha, can_null, ply + 1, update_pv=True)
                 if score > alpha and score < beta:  # check for failure high (> alpha), else keep score
                     self.pvs_research += 1
@@ -380,7 +382,12 @@ class Searcher:
             if best >= beta:  # failed high, lower bound
                 flag = 1
                 # killers = non-captures that are beta-cutoffs
-                if best > beta and not board.is_capture(best_move) and best_move != NULL_MOVE:
+                if (
+                    best > beta
+                    and not board.is_capture(best_move)
+                    and best_move != NULL_MOVE
+                    and not best_move.promotion
+                ):
                     self.killers[ply].append(best_move)
 
             if best <= alpha_orig:  # failed low, upper bound
@@ -391,7 +398,7 @@ class Searcher:
 
             # if no entry or this depth is less or eq to existing
             if not self.tt_score.get(z_hash) or depth <= self.tt_score[z_hash][1]:
-                self.tt_score[z_hash] = (depth, flag, best, best_move)
+                self.tt_score[z_hash] = (depth, flag, best, best_move, board.copy())
             return best
         else:  # no moves
             if board.is_check():

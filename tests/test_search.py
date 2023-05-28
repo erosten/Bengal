@@ -83,7 +83,7 @@ if __name__ == '__main__':
         out_p = out_p / f"run_{dt.strftime('%Y_%m_%d')}.prof"
 
     stats.dump_stats(str(out_p))
-    print(f'Stats dumped to {out_f}')
+    print(f'Stats dumped to {out_p}')
 
     data = [
         (

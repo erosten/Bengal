@@ -31,7 +31,9 @@ GAME_PHASE_VALUES = [0, 1, 1, 2, 4, 0]
 ONE = "1"
 ''' TUNE '''
 
+from functools import lru_cache
 
+@lru_cache
 def evaluate(board: BoardT, ply: int = 0, verbose: bool = False) -> float:
     try:
         next(board.generate_legal_moves())
@@ -127,9 +129,6 @@ def evaluate(board: BoardT, ply: int = 0, verbose: bool = False) -> float:
     for i in range(6):
         material[WHITE] += counts[WHITE][i] * values[i]
         material[BLACK] += counts[BLACK][i] * values[i]
-    # count of piece * tapered value of
-    # material[chess.WHITE] = sum([cnt*values[i] for i, cnt in enumerate(counts[chess.WHITE])])
-    # material[chess.BLACK] = sum([cnt*values[i] for i, cnt in enumerate(counts[chess.BLACK])])
 
     material_diff = material[WHITE] - material[BLACK]
 

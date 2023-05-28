@@ -2069,6 +2069,27 @@ class Board(BaseBoard):
         else:
             yield from self.generate_pseudo_legal_moves(from_mask, to_mask)
 
+    def get_legal_generator(self, gen, from_mask: Bitboard = BB_ALL, to_mask: Bitboard = BB_ALL) -> Iterator[Move]:
+        if self.is_variant_end():
+            return
+
+        king_mask = self.kings & self.occupied_co[self.turn]
+        if king_mask:
+            king = msb(king_mask)
+            blockers = self._slider_blockers(king)
+            checkers = self.attackers_mask(not self.turn, king)
+            if checkers:
+                for move in self._generate_evasions(king, checkers, from_mask, to_mask):
+                    if self._is_safe(king, blockers, move):
+                        yield move
+            else:
+                for move in gen:
+                    if self._is_safe(king, blockers, move):
+                        yield move
+        else:
+            yield from gen
+
+
     def generate_legal_ep(self, from_mask: Bitboard = BB_ALL, to_mask: Bitboard = BB_ALL) -> Iterator[Move]:
         if self.is_variant_end():
             return
@@ -2522,17 +2543,6 @@ class Board(BaseBoard):
             while cache:
                 fr, to = cache.pop()
                 yield Move(fr, to)
-
-
-
-
- 
-
-
-
-
-
-
 
     def __hash__(self) -> int:
 
