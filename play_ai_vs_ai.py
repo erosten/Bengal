@@ -1,11 +1,11 @@
-from src.agents import AlphaBetaTTQ
+from src.agents import PrincipalV
 from src.game import Game
 
 
 def run_game(fen: str):
     try:
-        agent_w = AlphaBetaTTQ(depth=8)
-        agent_b = AlphaBetaTTQ(depth=3)
+        agent_w = PrincipalV(depth=10)
+        agent_b = PrincipalV(depth=3)
         game = Game(agent_w, agent_b, fen)
         game.play()
     except KeyboardInterrupt:

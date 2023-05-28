@@ -289,7 +289,7 @@ class Searcher:
             and depth > 3
             and can_null
             and not in_check
-            and (board.occupied_co[board.turn] & ~board.pawns).bit_count() > 2
+            and bin(board.occupied_co[board.turn] & ~board.pawns).count("1") > 2
         ):
             self.nm_tried += 1
             board.push(NULL_MOVE)

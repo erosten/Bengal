@@ -19,6 +19,7 @@ Notable changes to this project will be documented in this file.
 - Main search fn no longer passes around moves (cleanup)
 - PV updating moved to a utility function (cleanup)
 - Search opening book path handling improved
+- Pre-commit added for most files
 
 ## [0.0.1] - Initial Release
 

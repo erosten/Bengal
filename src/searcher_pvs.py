@@ -48,10 +48,12 @@ class Searcher:
                 self.book_op = None
 
     def find_move(self, board: BoardT, depth: int) -> Move:
+        score = -1000
+        moves = []
         for s, m in self._search_at_depth(board, depth=depth):
-            score = s
-            moves = m
-
+            if m:
+                score = s
+                moves = m
         return score, moves
 
     # iterative depeening on search subroutine
@@ -91,7 +93,7 @@ class Searcher:
 
         if entry:
             self.nbook += 1
-            return BOOK_SCORE, [entry.move.uci()]
+            yield BOOK_SCORE, [entry.move.uci()]
 
         for d in range(1, depth + 1):
             self.ids_depth = d
@@ -309,7 +311,7 @@ class Searcher:
             and can_null
             and not in_check
             and not pv_node
-            and (board.occupied_co[board.turn] & ~board.pawns).bit_count() > 2
+            and bin(board.occupied_co[board.turn] & ~board.pawns).count("1") > 2
         ):
             self.nm_tried += 1
             board.push(NULL_MOVE)

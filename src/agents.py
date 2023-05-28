@@ -90,7 +90,7 @@ class AlphaBetaTTQ:
         return ai_move
 
 
-class PrincipalVariation:
+class PrincipalV:
     def __init__(self, depth: int = 3):
         self.depth = depth
         self.searcher = PVSearcher()
