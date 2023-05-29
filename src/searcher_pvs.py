@@ -1,37 +1,40 @@
 import os
-import sys
 import time
 from collections import defaultdict
 from typing import Optional, Tuple
 
 from chess.polyglot import open_reader
-from loguru import logger
 from tabulate import tabulate
 
-from .board import BoardT, Move, MoveType
-from .hueristic import MATE_VALUE, MG_VALUE, evaluate
-
-logger.remove()
-logger.add(sys.stderr, level="DEBUG")
+from .board import BoardT, Move, MoveType, popcount
+from .hueristic import EG_VALUE, MATE_VALUE, evaluate
+from .utils import logger
 
 NULL_MOVE = Move.null()
 
 
-DEFAULT_BOOK_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'books/bin/Cerebellum_Light_Poly.bin')
+DEFAULT_BOOK_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'books/bin/M11_2.bin')
 BOOK_SCORE = 1337
 
 ''' TUNE '''
-DELTA_PRUNE_SAFETY_MARGIN = MG_VALUE[0] * 2
+DELTA_PRUNE_SAFETY_MARGIN = EG_VALUE[0] * -0.5
 FUTILITY_MARGIN = 500
+ZW_SEARCH_WIDTH = EG_VALUE[0]
+
+NMP_DEPTH = 3
+NMP_REDUC = 2
+OPENING_BOOK = True
 ''' TUNE '''
 
 
-def wrap_gen_insert_move(gen, initial_move):
-    if initial_move is not None:
-        yield initial_move
-    for move in gen:
-        if gen != initial_move:
-            yield move
+def wrap_gen_insert_moves(gen, initial_moves):
+    for move in initial_moves:
+        if move is not None:
+            yield move, MoveType.OTHER
+
+    for move, move_type in gen:
+        if move not in initial_moves:
+            yield move, move_type
 
 
 class Searcher:
@@ -47,6 +50,15 @@ class Searcher:
                 logger.warning(f'Couldnt find default opening book {DEFAULT_BOOK_PATH}, proceeding without')
                 self.book_op = None
 
+        # History Hueristic
+        # 64 x 64 for from,to indices for ea color
+        self.history = {
+            True: [[0 for _ in range(64)] for _ in range(64)],
+            False: [[0 for _ in range(64)] for _ in range(64)],
+        }
+
+        self.pos_hist = set()
+
     def find_move(self, board: BoardT, depth: int) -> Move:
         score = -1000
         moves = []
@@ -55,6 +67,7 @@ class Searcher:
                 score = s
                 moves = m
                 if score == BOOK_SCORE:
+                    print('book')
                     return score, moves
         return score, moves
 
@@ -90,10 +103,13 @@ class Searcher:
         self.ids_depth = 0
         score = 0
 
+        # Save in position history
+        self.pos_hist.add(board._board_pieces_state())
+
         # Try to find a book move
         entry = None if not self.book_op else self.book_op.get(board)
 
-        if entry:
+        if OPENING_BOOK and entry:
             self.nbook += 1
             depth = -1
             yield BOOK_SCORE, [entry.move.uci()]
@@ -140,7 +156,7 @@ class Searcher:
                 self.pv_table[0][0],
                 score,
             ]
-            logger.warning(f"cur pv: {[m for m in self.pv_table[0] if m != 0]}")
+            logger.debug(f"cur pv: {[m for m in self.pv_table[0] if m != 0]}")
             table = tabulate([data], headers=labels, tablefmt='grid')
             # Principal Variation
             self.pv = [m for m in self.pv_table[0] if m != 0]
@@ -176,7 +192,7 @@ class Searcher:
         for move, move_type in board.generate_sorted_non_qs_moves():
             # Delta pruning on capture
             if dp and move_type == MoveType.CAPTURE:
-                pieceval = MG_VALUE[board.piece_type_at(move.to_square) - 1]
+                pieceval = EG_VALUE[board.piece_type_at(move.to_square) - 1]
                 self.dtnodes_tried += 1
                 if stand_pat + (pieceval + DELTA_PRUNE_SAFETY_MARGIN) < alpha:
                     self.dtnodes += 1
@@ -219,36 +235,47 @@ class Searcher:
         z_hash = board.__hash__()
         self.pv_length[ply] = ply
         in_check = board.is_check()
-        pv_node = alpha != beta - 90
+        root_node = ply == 0
+        pv_node = alpha != beta - ZW_SEARCH_WIDTH
         # So we know whether this is a best score node
         alpha_orig = alpha
+
+        if not root_node:
+            # Mate Distance Prune
+            beta = min(beta, MATE_VALUE - ply - 1)
+            alpha = max(alpha, ply - MATE_VALUE - ply)
+            if alpha >= beta:
+                return alpha
 
         # Quiesce at depth = 0
         if depth == 0:
             # only delta prune when a certain amount of pieces maybe?
-            dp = True if self.ids_depth > 2 else False
-            score = self.quiesce(board, 0, alpha, beta, ply, dp=dp)
+            # dp = True if self.ids_depth > 2 else False
+            score = self.quiesce(board, 0, alpha, beta, ply, dp=False)
             return score
+
+        # Don't repeat positions
+        if not root_node and board._board_pieces_state() in self.pos_hist:
+            return 0
 
         # Start to generate moves
         # Moves are added FILO (First in Last out)
         # Although even last moves will go before any board generated moves
-        move_gen = board.generate_sorted_pseudo_legal_moves()
-
+        moves_first = []
         # Killers
         if self.killers[ply]:
             if len(self.killers[ply]) >= 2:
                 kmove_2 = self.killers[ply][-2]
                 if board.is_legal(kmove_2):
                     self.kmoves_tot += 1
-                    move_gen = wrap_gen_insert_move(move_gen, kmove_2)
+                    moves_first.append(kmove_2)
                 else:
                     self.kmoves_ill += 1
 
             kmove = self.killers[ply][-1]
             if board.is_legal(kmove):
                 self.kmoves_tot += 1
-                move_gen = wrap_gen_insert_move(move_gen, kmove)
+                moves_first.append(kmove)
             else:
                 self.kmoves_ill += 1
 
@@ -265,7 +292,7 @@ class Searcher:
             elif flag == 0:  # exact
                 if tt_move != NULL_MOVE:
                     assert board.is_legal(tt_move)
-                    move_gen = wrap_gen_insert_move(move_gen, tt_move)
+                    moves_first.append(tt_move)
 
             elif flag == 1:  # lower bound
                 if tt_score > alpha:
@@ -276,7 +303,7 @@ class Searcher:
                         self.update_pv(tt_move, ply)
                         # add hash moves to move gen
                         assert board.is_legal(tt_move)
-                        move_gen = wrap_gen_insert_move(move_gen, tt_move)
+                        moves_first.append(tt_move)
 
             elif flag == 2:  # upper bound
                 beta = min(beta, tt_score)
@@ -286,7 +313,6 @@ class Searcher:
 
         # if we have been through at least depth=1 of IDS
         # try PV moves first
-        last_move = None
         dist_fr_root = self.ids_depth - depth
         # if there is an entry for this depth already
         if self.pv_table[0][dist_fr_root] != 0:
@@ -301,27 +327,27 @@ class Searcher:
 
             if last_move is not None:
                 assert board.is_legal(last_move)
-
-        move_gen = wrap_gen_insert_move(move_gen, last_move)
-        # move_gen = board.legal_moves
+                moves_first.append(last_move)
 
         # Null Move Pruning
         # If we are in zugzwang, this is mistake
         # so check there is at least one major piece on the board
         if (
             dist_fr_root > 0
-            and depth >= 3
+            and depth >= NMP_DEPTH
             and can_null
             and not in_check
             and not pv_node
-            and bin(board.occupied_co[board.turn] & ~board.pawns).count("1") > 2
+            and popcount(board.occupied_co[board.turn] & ~board.pawns) > 1
         ):
             self.nm_tried += 1
             board.push(NULL_MOVE)
-            score = -self.pvs(board, depth - 1 - 2, -beta, -beta + 90, False, ply + 1, update_pv=False)
+            score = -self.pvs(
+                board, depth - 1 - NMP_REDUC, -beta, -beta + ZW_SEARCH_WIDTH, False, ply + 1, update_pv=False
+            )
             board.pop()
 
-            if score > beta:  # if not strict, illegal move in 3s mate test #17
+            if score >= beta:  # if not strict, illegal move in 3s mate test #17
                 self.nm += 1
 
                 if ply > 0:
@@ -333,25 +359,26 @@ class Searcher:
         found_pv = False
         best = -float('inf')  # best score board.turn can get from this pos
         best_move = NULL_MOVE
-        move_gen = board.get_legal_generator(move_gen)
-        for move in move_gen:
+        move_gen = board.generate_sorted_pseudo_legal_moves(self.history[board.turn])
+        move_gen = board.get_legal_generator(wrap_gen_insert_moves(move_gen, moves_first))
+        for move, move_type in move_gen:
             found = True
             board.push(move)
 
             # Futlity Pruning
-            if depth <= 2 and self.ids_depth > 3 and not in_check and not pv_node:
-                eval = evaluate(board)
-                self.ftnodes_tried += 1
-                if eval - FUTILITY_MARGIN >= beta:
-                    best_move = move
-                    best = min(eval, beta)  # at some point should be eval?
-                    self.ftnodes += 1
-                    board.pop()
-                    return best
+            # if depth <= 2 and self.ids_depth > 3 and not in_check and not pv_node:
+            #     eval = evaluate(board)
+            #     self.ftnodes_tried += 1
+            #     if eval - FUTILITY_MARGIN >= beta:
+            #         best_move = move
+            #         best = min(eval, beta)  # at some point should be eval?
+            #         self.ftnodes += 1
+            #         board.pop()
+            #         return best
 
             if found_pv:
                 # zero window search around pv to check if it is still pv
-                score = -self.pvs(board, depth - 1, -alpha - 90, -alpha, can_null, ply + 1, update_pv=True)
+                score = -self.pvs(board, depth - 1, -alpha - ZW_SEARCH_WIDTH, -alpha, can_null, ply + 1, update_pv=True)
                 if score > alpha and score < beta:  # check for failure high (> alpha), else keep score
                     self.pvs_research += 1
                     score = -self.pvs(board, depth - 1, -beta, -alpha, can_null, ply + 1, update_pv=True)
@@ -375,6 +402,10 @@ class Searcher:
                         self.kmoves += 1
                     break
 
+                # save in history
+                if move_type is MoveType.CAPTURE:
+                    self.history[board.turn][best_move.from_square][best_move.to_square] += 2**depth
+
         if found:
 
             # TT Management
@@ -385,7 +416,7 @@ class Searcher:
                 if (
                     best > beta
                     and not board.is_capture(best_move)
-                    and best_move != NULL_MOVE
+                    and best_move is not NULL_MOVE
                     and not best_move.promotion
                 ):
                     self.killers[ply].append(best_move)
@@ -399,6 +430,7 @@ class Searcher:
             # if no entry or this depth is less or eq to existing
             if not self.tt_score.get(z_hash) or depth <= self.tt_score[z_hash][1]:
                 self.tt_score[z_hash] = (depth, flag, best, best_move, board.copy())
+
             return best
         else:  # no moves
             if board.is_check():

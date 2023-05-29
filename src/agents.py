@@ -2,9 +2,6 @@ import random
 from abc import ABC, abstractmethod
 
 from .board import BoardT, Move
-from .searcher_ab_ids_hsh_q import Searcher as QABTTSearcher
-from .searcher_alphabeta import Searcher as AlphaBetaSearcher
-from .searcher_negamax import Searcher as NegaMaxSearcher
 from .searcher_pvs import Searcher as PVSearcher
 
 
@@ -55,39 +52,6 @@ class Random:
 class User:
     def get_move(self, board: BoardT) -> str:
         return get_user_move(board)
-
-
-class NegaMax:
-    def __init__(self, depth: int = 3):
-        self.depth = depth
-        self.searcher = NegaMaxSearcher()
-
-    def get_move(self, board: BoardT) -> str:
-        ai_move = self.searcher.find_move(board, depth=self.depth)
-
-        return ai_move.uci()
-
-
-class AlphaBeta:  # Negamax
-    def __init__(self, depth: int = 3):
-        self.depth = depth
-        self.searcher = AlphaBetaSearcher()
-
-    def get_move(self, board: BoardT) -> str:
-        ai_move = self.searcher.find_move(board, depth=self.depth)
-
-        return ai_move.uci()
-
-
-class AlphaBetaTTQ:
-    def __init__(self, depth: int = 3):
-        self.depth = depth
-        self.searcher = QABTTSearcher()
-
-    def get_move(self, board: BoardT) -> str:
-        ai_move = self.searcher.find_move(board, depth=self.depth)
-
-        return ai_move
 
 
 class PrincipalV:

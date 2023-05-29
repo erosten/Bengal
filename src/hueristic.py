@@ -46,8 +46,6 @@ def evaluate(board: BoardT, ply: int = 0, verbose: bool = False) -> float:
     if (
         board.is_insufficient_material()
         or board.is_seventyfive_moves()
-        or board.is_fivefold_repetition()
-        or board.is_repetition()
     ):
         return 0
     # material from pieces
@@ -140,22 +138,9 @@ def evaluate(board: BoardT, ply: int = 0, verbose: bool = False) -> float:
     if verbose:
         print('Material', 'PST', 'Pawns MG', 'Score')
         print(material_diff, pst, pawns_mg, score)
-    return score if board.turn else -score
-    # return material + pst
-
-
-# stalemate or checkmate
-# def evaluate_no_move_board(board: BoardT, ply: int) -> float:
-#     if board.is_check():
-#         return MATE_VALUE if board.turn else -MATE_VALUE
-#     elif board.is_stalemate():
-#         return 0
-#     elif board.is_insufficient_material():
-#         return 0
-#     else:
-#         # print('?')
-#         import pdb; pdb.set_trace()
-#         return -10000000000000000000000000
+    
+    score = score if board.turn else -score
+    return score
 
 
 def evaluate_explained(board: BoardT) -> float:

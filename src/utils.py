@@ -1,3 +1,11 @@
+import sys
+
+from loguru import logger
+
+logger.remove()
+logger.add(sys.stderr, level="DEBUG")
+
+
 def display(board):
 
     # def print_board(self, board_state, captured={"w": [], "b": []}):

@@ -2,6 +2,20 @@
 
 Notable changes to this project will be documented in this file.
 
+## [0.0.3] - More Search Improvements
+
+#### Search
+
+- History Hueristic for non-capture moves
+  - Initial tests show improvement in node count/speed
+- Improved draw detection
+  - As a side effect, improved performance by not having to check for repetitions in eval
+- Full NMP is back (>= beta, check for one major piece)
+
+#### General
+
+- Bugfix for the same move potentially being searched multiple times
+
 ## [0.0.2] - Search Improvements + More
 
 - Was undefeated in around 10 games against an 1800 rated human player in 30s games!

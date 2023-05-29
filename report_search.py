@@ -3,8 +3,8 @@ import pstats
 import time
 from pathlib import Path
 
-from src.board import Board
-from src.searcher_ab_ids_hsh_q import Searcher as ABTTQSearcher
+from src.board import Board, Move
+from src.searcher_pvs import Searcher as PVSearcher
 from src.utils import display
 
 profiler = cProfile.Profile()
@@ -14,12 +14,27 @@ def test(fen=None):
 
     # b = Board(fen="r1bq1b1r/ppp3pp/2n1k3/3np3/2B5/5Q2/PPPP1PPP/RNB1K2R w KQha - 0 1")
     b = Board(fen)
+    s = PVSearcher()
+    b.push(Move.from_uci('e3f3'))
+    s.pos_hist.add(b._board_pieces_state())
+    b.push(Move.from_uci('f5e4'))
+    s.pos_hist.add(b._board_pieces_state())
+    b.push(Move.from_uci('f3e3'))
+    s.pos_hist.add(b._board_pieces_state())
+    b.push(Move.from_uci('e4f5'))
+    s.pos_hist.add(b._board_pieces_state())
+    b.push(Move.from_uci('e3f3'))
+    s.pos_hist.add(b._board_pieces_state())
+    b.push(Move.from_uci('f5e4'))
+    # s.pos_hist.add(b.copy())
+    import pdb
+
+    pdb.set_trace()
     display(b)
-    s = ABTTQSearcher()
     t1 = time.time()
     profiler.enable()
     # score,m = s._search_at_depth(b,depth=d)
-    score, m = s._search_at_depth(b, depth=7, can_null=True)
+    score, m = s.find_move(b, depth=7)
     profiler.disable()
 
     t = time.time() - t1

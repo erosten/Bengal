@@ -1,9 +1,9 @@
-from src.agents import AlphaBetaTTQ, User
+from src.agents import PrincipalV, User
 from src.game import Game
 
 
 def run_game(fen: str):
-    agent_b = AlphaBetaTTQ(depth=5)
+    agent_b = PrincipalV(depth=5)
     agent_w = User()
     game = Game(agent_w, agent_b, fen)
     game.play()

@@ -15,8 +15,6 @@ from tqdm import tqdm
 
 from src.board import Board
 from src.searcher_ab_ids_hsh_q import Searcher as ABTTQSearcher
-from src.searcher_alphabeta import Searcher as ABSearcher
-from src.searcher_negamax import Searcher
 from src.searcher_pvs import Searcher as PVSearcher
 from src.utils import display
 
@@ -41,9 +39,6 @@ def test(filter=None):
             continue
 
         b = Board(fen)
-        s = Searcher()
-        # s = PVSearcher()
-        # s = ABSearcher()
         s = ABTTQSearcher()
         s = PVSearcher()
         t1 = time.time()

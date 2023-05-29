@@ -12,7 +12,6 @@ from pathlib import Path
 
 from src.board import Board, Move
 from src.searcher_ab_ids_hsh_q import Searcher as ABTTQSearcher
-from src.searcher_alphabeta import Searcher as ABSearcher
 from src.searcher_pvs import Searcher as PVSearcher
 
 profiler = cProfile.Profile()
@@ -35,7 +34,7 @@ def test_mate_in_threes(fen_filter):
     valid_fens.sort()
 
     invalid_fens = []
-    for fen in tqdm(valid_fens):
+    for fen in tqdm(valid_fens[50:]):
         if fen_filter != None and fen != fen_filter:
             continue
         board = Board(fen)
@@ -57,7 +56,7 @@ def test_mate_in_threes(fen_filter):
             invalid_fens.append(fen)
             # import pdb; pdb.set_trace()
 
-    print(f'Found {len(valid_fens) - len(invalid_fens)}/{len(valid_fens)} valid, {len(invalid_fens)} invalid')
+    print(f'Found {len(valid_fens) - len(invalid_fens)}/{len(valid_fens)} mates, {len(invalid_fens)} non-mates')
     import pdb
 
     pdb.set_trace()
@@ -95,4 +94,4 @@ if __name__ == '__main__':
         out_p = out_p / f"run_{dt.strftime('%Y_%m_%d')}.prof"
 
     stats.dump_stats(str(out_p))
-    print(f'Stats dumped to {out_f}')
+    print(f'Stats dumped to {out_p}')
