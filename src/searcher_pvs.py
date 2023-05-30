@@ -63,7 +63,7 @@ class Searcher:
                 self.endg_table = open_tablebase(DEFAULT_TABLEBASE_DIR)
             except Exception:
                 logger.warning(f'Couldnt find default tablebase dir {DEFAULT_TABLEBASE_DIR}, proceeding without')
-                self.book_op = None
+                self.endg_table = None
 
         # History Hueristic
         # 64 x 64 for from,to indices for ea color
