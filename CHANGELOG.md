@@ -10,11 +10,18 @@ Notable changes to this project will be documented in this file.
   - Initial tests show improvement in node count/speed
 - Improved draw detection
   - As a side effect, improved performance by not having to check for repetitions in eval
+- Mate pruning on actual nodes instead of only scores (faster on mate detection)
 - Full NMP is back (>= beta, check for one major piece)
+
+#### Eval
+
+- Most of pawn eval is implemented
 
 #### General
 
 - Bugfix for the same move potentially being searched multiple times
+- Remove older search options
+- Codebase-wide logger in utils
 
 ## [0.0.2] - Search Improvements + More
 

@@ -11,6 +11,19 @@ from .board import (  # BB_FILES,; Color,; Square,; SquareSet,; scan_reversed,; 
     WHITE,
     BoardT,
     scan_reversed,
+    shift_up,
+    shift_down,
+    shift_up_right,
+    shift_up_left,
+    shift_down_right,
+    shift_down_left,
+    shift_left,
+    shift_right,
+    BB_RANK_1, BB_RANK_2, BB_RANK_7, BB_RANK_8,
+    BB_RANK_3, BB_RANK_6,
+    BB_RANKS, BB_FILES, BB_ALL, BB_EMPTY,
+    square_file, square_rank,
+    popcount
 )
 from .piece_square_tables import EG_TABLE, EG_TABLE_W, MG_TABLE, MG_TABLE_W
 
@@ -19,7 +32,7 @@ Us = 'US'
 Them = 'Them'
 
 ''' TUNE '''
-MATE_VALUE = 8 * 1025
+MATE_VALUE = 8 * 1025 + 2 * 512 + 2 * 365 + 2 * 337
 
 # p, n, b, r, q, k
 MG_VALUE = [82, 337, 365, 477, 1025, 0]
@@ -130,14 +143,136 @@ def evaluate(board: BoardT, ply: int = 0, verbose: bool = False) -> float:
 
     material_diff = material[WHITE] - material[BLACK]
 
+
+    # create attackers mask
+    # attackedByPc = {
+    #     c: {
+    #         ptype: BB_EMPTY for ptype in PIECE_TYPES
+    #     }  for c in COLORS
+    # }
+
+    # attackedBy = {
+    #     c: BB_EMPTY for c in COLORS
+    # }
+    # for c in COLORS:
+    #     for ptype, pieces in occ_co_pieces[c].items():
+    #         for pc in scan_reversed(pieces):
+    #             m = board.attacks_mask(pc)
+    #             attackedByPc[c][ptype] |= m
+    #             attackedBy[c] |= m
+    
+    # import pdb; pdb.set_trace()
+
+
+
+
+
     # pawns
-    # pawns_mg = _pawns_mg_color(occ_co_pieces[c][PAWN]) - _pawns_mg_color(occ_co_pieces[not c][PAWN])
-    pawns_mg = 0
+    # TODO - backward for weak unopposed pawn impl requires attackers
+    if board.turn:
+        back = shift_down
+        block_ranks = BB_RANK_2 | BB_RANK_3
+        pawn_att_squares = lambda pawns: shift_up_left(pawns) | shift_up_right(pawns)
+    else:
+        back = shift_up
+        block_ranks = BB_RANK_7 | BB_RANK_6
+        pawn_att_squares = lambda pawns: shift_down_left(pawns) | shift_down_right(pawns)
+
+    pawns_mgc = [0,0]
+    mobility_mgc = [0,0]
+    for c in COLORS:
+        pawns = occ_co_pieces[c][PAWN]
+
+        their_pawns = occ_co_pieces[not c][PAWN]
+        their_pawns_pushed = back(their_pawns)
+
+        # pawns that are supported
+        supp_pawns = pawn_att_squares(pawns) & pawns
+
+        # doubled in classical sense and not supported
+        doubled_pawns = (back(pawns) & pawns) & ~supp_pawns   
+        blocked_pawns = their_pawns_pushed & block_ranks
+        
+        score = 0
+        for pawn_sq in scan_reversed(pawns):
+            pawn = 1 << pawn_sq
+            file = BB_FILES[square_file(pawn_sq)]
+            files_adj = (shift_left(file) | shift_right(file))
+            # their pawn right in front
+            blocked = their_pawns_pushed & pawn & block_ranks
+            # their pawn at any point in same file
+            opposed = their_pawns & file
+            # no friendly pawns in adjacent files
+            isolated = files_adj & pawns
+            # defended by another pawn
+            supported = supp_pawns & pawn
+            # rank of pawn
+            rank = square_rank(pawn_sq)
+            rank_bonus_idx = rank if c else 7 - rank
+            # phalanx - pawns on adjacent files, same rank
+            phalanx = (files_adj & BB_RANKS[rank]) & pawns
+            # doubled - doubled and not supported
+            doubled = doubled_pawns & pawn
+
+            # doubled/isolated penalties
+            is_doubled = popcount(doubled) > 0
+            is_iso = popcount(isolated) == 0
+            if is_doubled and is_iso:
+                score -= 11
+            elif is_iso:
+                score -= 5
+            
+            if is_doubled:
+                score -= 11
+            
+            # connected bonus - phalanx or supported pawns
+            is_supp = popcount(supported) > 0
+            is_phal = popcount(phalanx) > 0
+            is_opp = popcount(opposed) > 0
+            # connected pawns further up are more valuable
+            rank_scale = [0, 3, 4, 6, 15, 24, 48]
+            if is_supp or is_phal:
+                if rank_bonus_idx not in (0,7):
+                    score += rank_scale[rank_bonus_idx] * (2+int(is_phal) - int(is_opp)) + 11 * int(is_supp)
+
+            # blocked penalty
+            is_blocked = popcount(blocked) > 0
+            if is_blocked:
+                if rank_bonus_idx == 2:
+                    score -= 11
+                elif rank_bonus_idx == 3:
+                    score -= 3
+
+        pawns_mgc[c] = score
+
+        # threats
+
+
+        # mobility
+        # early_pawns = pawns & block_ranks
+        # kings_queens = occ_co_pieces[c][QUEEN] | occ_co_pieces[c][KING]
+        # enemy_pawn_attcked_sqs = pawn_att_squares(their_pawns)
+        # for p 
+#             # pinned pieces to king
+#             sqs = []
+#             for p in self.pieces[c]['all']:
+#                 if self.board.is_pinned(c, p):
+#                     sqs.append(p)
+#             pinned_sqs = SquareSet(sqs)
+#             return ~(blocked_pawns | early_rank_pawns | kings_queens | enemy_pawn_controlled_sqs | pinned_sqs)
+
+
+
+    # finishing up
+    pawns_mg = pawns_mgc[WHITE] - pawns_mgc[BLACK]
+
+    # mobility
+
 
     score = material_diff + pst + pawns_mg
     if verbose:
         print('Material', 'PST', 'Pawns MG', 'Score')
-        print(material_diff, pst, pawns_mg, score)
+        print(material_diff, pst, f'{pawns_mgc[WHITE]}, {pawns_mgc[BLACK]}', score)
     
     score = score if board.turn else -score
     return score
@@ -147,170 +282,7 @@ def evaluate_explained(board: BoardT) -> float:
     return evaluate(board, verbose=True)
 
 
-# def _pawns_mg_color(pawns: int, c: Color):
-#     score = 0
 
-
-#     # for ranks 5,6 increased bonus for blocked pawns
-#     blocking_bonuses = [5, 8]
-
-#     for sq in pawns:
-#         sq_sqset = SquareSet([sq])
-
-
-#         if doubled_isolated(sq, sq_sqset, c):
-#             score -= 6
-#         elif isolated(sq, c):
-#             score -= 3
-#         # elif _backward():
-#         #      score -= 9
-
-#         score -= doubled(sq_sqset, c) * 6
-#         score += connected_bonus(sq, sq_sqset, c)
-#         score -= 7 * weak_and_unopposed(sq, sq_sqset, c)
-
-#         # add blockedstarting on 5th rank
-#         if blocked(sq_sqset, c) and rank(sq, c) >= 5:
-#             score += blocking_bonuses[rank(sq, c) - 5]
-
-#     # if True:
-#     #     print(f'pawn score contribution {c}: {score}')
-#     return score
-
-
-# def _doubled_isolated(sq: Square, sq_sqset: SquareSet, color: Color) -> bool:
-#     return _isolated(sq, color) and _doubled(sq_sqset, color)
-
-# def _weak_and_unopposed(sq: Square, sq_sqset: SquareSet, color: Color) -> bool:
-#     if _opposed(sq_sqset, color):
-#         return False
-
-#     # is it weak?
-#     # TODO: Backward?
-#     # return _isolated(sq, my_pawns) or _backward()
-#     return _isolated(sq, color)
-
-# # no pawns on adjacent files
-# def _isolated(sq: Square, color: Color) -> bool:
-#     mask = SquareSet(BB_FILES[square_file(sq)])
-
-#     left = shift_left(mask)
-#     right = shift_right(mask)
-
-#     adj_file_pawns = (left | right) & pieces[color][PAWN]
-#     return len(adj_file_pawns) == 0
-
-# # In chess, an doubled pawn is a pawn which has another friendly pawn on same file but in Stockfish we attach doubled pawn penalty only for pawn which has another friendly pawn on square directly behind that pawn and is not supported.
-# # From https://hxim.github.io/Stockfish-Evaluation-Guide/
-# def _doubled(self, sq_sqset: SquareSet, color: Color) -> bool:
-
-#     my_pawns = self.pieces[color][PAWN]
-
-#     # check if any pawns directly behind
-#     if color: # white
-#         mask = shift_down(sq_sqset)
-#     else:
-#         mask = shift_up(sq_sqset)
-
-#     pawns_right_behind = mask & my_pawns
-
-#     if len(pawns_right_behind) == 0:
-#             return False
-
-#     # check if those pawns are supported
-#     if color: # white, check down, left/right
-#         mask = shift_down_left(sq_sqset) | shift_down_right(sq_sqset)
-#     else: # black, check up,left/right
-#         mask = shift_up_left(sq_sqset) | shift_up_right(sq_sqset)
-
-#     support_pawns = mask & my_pawns
-
-#     if len(support_pawns) == 0:
-#             return True
-
-#     return False
-
-# # our own pawns are blocked
-# def _blocked(sq_sqset: SquareSet, color: Color) -> bool:
-#     if color: # white, blocked are things up
-#         mask = shift_up(sq_sqset)
-#     else: # black, blocked are things down
-#         mask = shift_down(sq_sqset)
-
-#     pawns_in_front_of_my_pawns = mask & pieces[color][PAWN]
-
-#     assert len(pawns_in_front_of_my_pawns) <= 1
-#     return len(pawns_in_front_of_my_pawns) > 0
-
-# # cannot be safely advanced part needs attacks/moves
-# def _backward() -> bool:
-#     pass
-
-
-#     # def weak_unopposed_pawn():
-#     #      pass
-#     # def blocked():
-#     #      pass
-
-# def _connected_bonus(sq: Square, sq_sqset: SquareSet, color: Color) -> int:
-
-
-#         supp = _supported(sq_sqset, color)
-#         phal = _phalanx(sq_sqset, color)
-
-#         # connected pawns further up are more valuable
-#         rank_scale = [0, 3, 4, 6, 15, 24, 48]
-#         if supp or phal: # is connected
-#             r = _rank(sq, color)
-
-#             if r in (0,7): # first or last rank
-#                     return 0
-
-#             opp = _opposed(sq_sqset, color)
-#             return rank_scale[r-1] * (2 + int(phal) - int(opp)) + 11 * supp
-#         else:
-#             return 0
-
-# # has pawn of opposing color right in front of it
-# def _opposed(sq_sqset: SquareSet, color: Color) -> bool:
-#     if color: # white
-#         mask = shift_up(sq_sqset)
-#     else:
-#         mask = shift_down(sq_sqset)
-
-#     opposed = mask & pieces[not color][chess.PAWN]
-
-#     assert len(opposed) <= 1
-#     return len(opposed) == 1
-
-
-# def _rank(sq: Square, color: Color) -> int:
-#     if color: # white, so more rank is higher -> if sq is A8, chess.square_rank = 7 and return 7
-#         return square_rank(sq)
-#     else: # black, so more rank is lower -> if sq is A3, chess.square_rank = 2 and return 7 - 2 => 5
-#         return 7 - square_rank(sq)
-
-#     # 0 or 1
-#     # adjacent pawns to phalanx
-
-# def _phalanx(sq_sqset: SquareSet, color: Color) -> bool:
-#     mask = shift_left(sq_sqset) | shift_right(sq_sqset)
-#     phalanx_pawns = mask & pieces[color][chess.PAWN]
-#     assert len(phalanx_pawns) <= 2
-#     return len(phalanx_pawns) >= 1
-
-#     # number of pawn defenders: 0,1 or 2
-
-# def _supported(sq_sqset: SquareSet, color: Color) -> bool:
-
-#     if color: # white, check down, left/right
-#         mask = shift_down_left(sq_sqset) | shift_down_right(sq_sqset)
-#     else: # black, check up,left/right
-#         mask = shift_up_left(sq_sqset) | shift_up_right(sq_sqset)
-
-#     supp_pawns = mask & pieces[color][chess.PAWN]
-#     assert len(supp_pawns) <= 2
-#     return len(supp_pawns) >= 1
 
 
 #     # entrypoint for _evaluate

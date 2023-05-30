@@ -4,6 +4,7 @@ from collections import defaultdict
 from typing import Optional, Tuple
 
 from chess.polyglot import open_reader
+from chess.syzygy import open_tablebase
 from tabulate import tabulate
 
 from .board import BoardT, Move, MoveType, popcount
@@ -16,14 +17,18 @@ NULL_MOVE = Move.null()
 DEFAULT_BOOK_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'books/bin/M11_2.bin')
 BOOK_SCORE = 1337
 
+DEFAULT_TABLEBASE_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'syzgy_345/')
+
+
 ''' TUNE '''
-DELTA_PRUNE_SAFETY_MARGIN = EG_VALUE[0] * -0.5
+DELTA_PRUNE_SAFETY_MARGIN = EG_VALUE[0] * 1
 FUTILITY_MARGIN = 500
 ZW_SEARCH_WIDTH = EG_VALUE[0]
 
 NMP_DEPTH = 3
 NMP_REDUC = 2
 OPENING_BOOK = True
+ENDGAME_TABLES = False
 ''' TUNE '''
 
 
@@ -38,7 +43,7 @@ def wrap_gen_insert_moves(gen, initial_moves):
 
 
 class Searcher:
-    def __init__(self, book_path: Optional[str] = None):
+    def __init__(self, book_path: Optional[str] = None, syzgy_dir: Optional[str] = None):
 
         # books
         if book_path:
@@ -50,9 +55,23 @@ class Searcher:
                 logger.warning(f'Couldnt find default opening book {DEFAULT_BOOK_PATH}, proceeding without')
                 self.book_op = None
 
+        # end game
+        if syzgy_dir:
+            self.endg_table = open_tablebase(syzgy_dir)
+        else:
+            try:
+                self.endg_table = open_tablebase(DEFAULT_TABLEBASE_DIR)
+            except Exception:
+                logger.warning(f'Couldnt find default tablebase dir {DEFAULT_TABLEBASE_DIR}, proceeding without')
+                self.book_op = None
+
         # History Hueristic
         # 64 x 64 for from,to indices for ea color
         self.history = {
+            True: [[0 for _ in range(64)] for _ in range(64)],
+            False: [[0 for _ in range(64)] for _ in range(64)],
+        }
+        self.cm_hist = {
             True: [[0 for _ in range(64)] for _ in range(64)],
             False: [[0 for _ in range(64)] for _ in range(64)],
         }
@@ -83,6 +102,7 @@ class Searcher:
         self.ftnodes_tried = 0
         self.dtnodes = 0
         self.dtnodes_tried = 0
+        self.egnodes = 0
         self.nm = 0
         self.nbook = 0
         self.nm_tried = 0
@@ -111,8 +131,15 @@ class Searcher:
 
         if OPENING_BOOK and entry:
             self.nbook += 1
-            depth = -1
+            depth = -1  # do not search further
             yield BOOK_SCORE, [entry.move.uci()]
+
+        # End-game tablebase transition
+        # if popcount(board.occupied) <= 5:
+        #     for d in range(1, depth + 1):
+        #         score, move = self.search_endgame(board, d)
+        #         logger.debug(f'ENDGAME (d={d}) score {score}, mv {move.uci()}')
+        #         yield score, move
 
         for d in range(1, depth + 1):
             self.ids_depth = d
@@ -251,7 +278,7 @@ class Searcher:
         if depth == 0:
             # only delta prune when a certain amount of pieces maybe?
             # dp = True if self.ids_depth > 2 else False
-            score = self.quiesce(board, 0, alpha, beta, ply, dp=False)
+            score = self.quiesce(board, 0, alpha, beta, ply, dp=True)
             return score
 
         # Don't repeat positions
@@ -359,22 +386,22 @@ class Searcher:
         found_pv = False
         best = -float('inf')  # best score board.turn can get from this pos
         best_move = NULL_MOVE
-        move_gen = board.generate_sorted_pseudo_legal_moves(self.history[board.turn])
+        move_gen = board.generate_sorted_pseudo_legal_moves(self.history[board.turn], self.cm_hist[board.turn])
         move_gen = board.get_legal_generator(wrap_gen_insert_moves(move_gen, moves_first))
         for move, move_type in move_gen:
             found = True
             board.push(move)
 
             # Futlity Pruning
-            # if depth <= 2 and self.ids_depth > 3 and not in_check and not pv_node:
-            #     eval = evaluate(board)
-            #     self.ftnodes_tried += 1
-            #     if eval - FUTILITY_MARGIN >= beta:
-            #         best_move = move
-            #         best = min(eval, beta)  # at some point should be eval?
-            #         self.ftnodes += 1
-            #         board.pop()
-            #         return best
+            if depth <= 2 and self.ids_depth > 3 and not in_check and not pv_node:
+                eval = evaluate(board)
+                self.ftnodes_tried += 1
+                if eval - FUTILITY_MARGIN >= beta:
+                    best_move = move
+                    best = min(eval, beta)  # at some point should be eval?
+                    self.ftnodes += 1
+                    board.pop()
+                    return best
 
             if found_pv:
                 # zero window search around pv to check if it is still pv
@@ -398,6 +425,10 @@ class Searcher:
                     self.update_pv(move, ply)
 
                 if alpha >= beta:
+                    # countermoves
+                    # if move_type is not MoveType.CAPTURE:
+                    #     last = board.move_stack[-1]
+                    #     self.cm_hist[board.turn][last.from_square][last.to_square] = move
                     if move in self.killers[ply]:
                         self.kmoves += 1
                     break
@@ -438,3 +469,38 @@ class Searcher:
                 return -MATE_VALUE + ply
             else:
                 return 0  # stalemate
+
+    def search_endgame(self, board: BoardT, depth):
+        # wdl = self.endg_table.probe_wdl(board)
+
+        best = -float('inf')
+        best_move = NULL_MOVE
+        for move, _ in board.generate_sorted_pseudo_legal_moves():
+            score = self.endg_table.probe_dtz(board)
+            if score > best:
+                best = score
+                best_move = move
+
+        return best, best_move
+
+    # see https://python-chess.readthedocs.io/en/latest/syzygy.html
+    # def _search_endgame(self, board: BoardT, depth, alpha = -float('inf'), beta = float('inf')):
+    #     self.egnodes += 1
+    #     if depth == 0:
+    #         dtz = self.endg_table.probe_dtz(board)
+    #         return dtz
+
+    #     move_gen = board.generate_sorted_pseudo_legal_moves()
+    #     best = -float('inf')
+    #     for move, _ in board.get_legal_generator(move_gen):
+    #         board.push(move)
+    #         dtz = -self._search_endgame(board, depth-1, -beta, -alpha)
+    #         board.pop()
+    #         if dtz > best:
+    #             best = dtz
+    #         if best > alpha:
+    #             alpha = best
+
+    #         if alpha >= beta:
+    #             break
+    #     return best

@@ -1009,23 +1009,39 @@ class BaseBoard:
         """
         return SquareSet(self.attacks_mask(square))
     
-    def _attack_squares(self, color: Color, square: Square) -> Bitboard:
-        rank_pieces = BB_RANK_MASKS[square]
-        file_pieces = BB_FILE_MASKS[square]
-        diag_pieces = BB_DIAG_MASKS[square]
+    # def king_checking_mask(self, color: Color, king: Square):
+    #     rank_pieces = BB_RANK_MASKS_E[king] & self.occupied
+    #     file_pieces = BB_FILE_MASKS_E[king] & self.occupied
+    #     diag_pieces = BB_DIAG_MASKS_E[king] & self.occupied
+    #     queens_and_rooks = (self.queens | self.rooks)
+    #     queens_and_bishops = (self.queens | self.bishops)
+    #     possible_attackers_mask = (
+    #         (BB_KNIGHT_ATTACKS[king]) & (self.knights) |
+    #         (BB_RANK_ATTACKS_E[king][rank_pieces]) & queens_and_rooks |
+    #         (BB_FILE_ATTACKS_E[king][file_pieces]) & queens_and_rooks |
+    #         (BB_DIAG_ATTACKS_E[king][diag_pieces]) & queens_and_bishops |
+    #         (BB_PAWN_ATTACKS[not color][king] & self.pawns))
 
-        queens_and_rooks = self.queens | self.rooks
-        queens_and_bishops = self.queens | self.bishops
+    #     return possible_attackers_mask
+    #    
+    def attacks_mask_xrays(self, square: Square) -> Bitboard:
+        bb_square = BB_SQUARES[square]
 
-        attackers = (
-            BB_KING_ATTACKS[square]|
-            BB_KNIGHT_ATTACKS[square]|
-            BB_RANK_ATTACKS[square][rank_pieces]|
-            BB_FILE_ATTACKS[square][file_pieces]|
-            BB_DIAG_ATTACKS[square][diag_pieces] |
-            BB_PAWN_ATTACKS[not color][square])
-
-        return attackers
+        if bb_square & self.pawns:
+            color = bool(bb_square & self.occupied_co[WHITE])
+            return BB_PAWN_ATTACKS[color][square]
+        elif bb_square & self.knights:
+            return BB_KNIGHT_ATTACKS[square]
+        elif bb_square & self.kings:
+            return BB_KING_ATTACKS[square]
+        else:
+            attacks = 0
+            if bb_square & self.bishops or bb_square & self.queens:
+                attacks = BB_DIAG_ATTACKS_E[square][BB_DIAG_MASKS_E[square]]
+            if bb_square & self.rooks or bb_square & self.queens:
+                attacks |= (BB_RANK_ATTACKS_E[square][BB_RANK_MASKS_E[square]] |
+                            BB_FILE_ATTACKS_E[square][BB_FILE_MASKS_E[square]])
+            return attacks
 
     def _attackers_mask(self, color: Color, square: Square, occupied: Bitboard) -> Bitboard:
         rank_pieces = BB_RANK_MASKS[square] & occupied
@@ -2337,7 +2353,7 @@ class Board(BaseBoard):
     # Moving king into check
     # Moving a piece that is blocking a checked king
     # En passant that moves out of a pin on king (some other stuff maybe?)
-    def generate_sorted_pseudo_legal_moves(self, history, from_mask: Bitboard = BB_ALL, to_mask: Bitboard = BB_ALL) -> Iterator[Move, MoveType]:
+    def generate_sorted_pseudo_legal_moves(self, history = None, cm_hist = None, from_mask: Bitboard = BB_ALL, to_mask: Bitboard = BB_ALL) -> Iterator[Move, MoveType]:
         our_pieces = self.occupied_co[self.turn] & from_mask
         enemy_pieces = self.occupied_co[not self.turn] & to_mask
 
@@ -2560,11 +2576,11 @@ class Board(BaseBoard):
         # Generate remaining non-capture, non-checking piece moves
         cache_moves = [mv for piece_cache in [knight_cache, bishop_cache, rook_cache, queen_cache, pawn_cache, king_cache] for mv in piece_cache]
         # sort by history hueristic
-        # EG_VALUE = [94, 281, 297, 512, 936, 0]
         # 
-        # knights, bishops, rooks, queens, pawns, kings
-        SORT_VALS = [10, 4000, 3000, 2000, 1000, 0]
-        cache_moves.sort(key = lambda mv: history[mv[0]][mv[1]]+SORT_VALS[self.piece_type_at(mv[0])-1], reverse=True)
+        if history and cm_hist:
+            # knights, bishops, rooks, queens, pawns, kings
+            SORT_VALS = [10, 4000, 3000, 2000, 1000, 0]
+            cache_moves.sort(key = lambda mv: history[mv[0]][mv[1]]+SORT_VALS[self.piece_type_at(mv[0])-1], reverse=True)
         for fr, to in cache_moves:
             yield Move(fr, to), MoveType.OTHER
 
