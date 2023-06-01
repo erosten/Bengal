@@ -1,3 +1,4 @@
+import math
 import os
 import time
 from collections import defaultdict
@@ -27,6 +28,9 @@ ZW_SEARCH_WIDTH = EG_VALUE[0]
 
 NMP_DEPTH = 3
 NMP_REDUC = 2
+
+LMR_DEPTH = 3
+
 OPENING_BOOK = True
 ENDGAME_TABLES = False
 ''' TUNE '''
@@ -35,7 +39,7 @@ ENDGAME_TABLES = False
 def wrap_gen_insert_moves(gen, initial_moves):
     for move in initial_moves:
         if move is not None:
-            yield move, MoveType.OTHER
+            yield move, MoveType.CUSTOM
 
     for move, move_type in gen:
         if move not in initial_moves:
@@ -263,7 +267,7 @@ class Searcher:
         self.pv_length[ply] = ply
         in_check = board.is_check()
         root_node = ply == 0
-        pv_node = alpha != beta - ZW_SEARCH_WIDTH
+        pv_node = alpha != beta - 1
         # So we know whether this is a best score node
         alpha_orig = alpha
 
@@ -278,7 +282,7 @@ class Searcher:
         if depth == 0:
             # only delta prune when a certain amount of pieces maybe?
             # dp = True if self.ids_depth > 2 else False
-            score = self.quiesce(board, 0, alpha, beta, ply, dp=True)
+            score = self.quiesce(board, 0, alpha, beta, ply, dp=False)
             return score
 
         # Don't repeat positions
@@ -318,7 +322,6 @@ class Searcher:
                 return tt_score
             elif flag == 0:  # exact
                 if tt_move != NULL_MOVE:
-                    assert board.is_legal(tt_move)
                     moves_first.append(tt_move)
 
             elif flag == 1:  # lower bound
@@ -329,7 +332,6 @@ class Searcher:
                         # update_pv handles null move lower bounds
                         self.update_pv(tt_move, ply)
                         # add hash moves to move gen
-                        assert board.is_legal(tt_move)
                         moves_first.append(tt_move)
 
             elif flag == 2:  # upper bound
@@ -344,17 +346,11 @@ class Searcher:
         # if there is an entry for this depth already
         if self.pv_table[0][dist_fr_root] != 0:
             if dist_fr_root == 0:  # depth = 2 root node
-                last_move = Move.from_uci(self.pv_table[0][0])
+                moves_first.append(Move.from_uci(self.pv_table[0][0]))
             else:
                 # last move on the board was the last depths PV move
                 if board.move_stack[-1] == self.pv_table[0][dist_fr_root - 1]:
-                    last_move = Move.from_uci(self.pv_table[0][dist_fr_root])
-                else:
-                    last_move = None  # last move wasnt prior PV
-
-            if last_move is not None:
-                assert board.is_legal(last_move)
-                moves_first.append(last_move)
+                    moves_first.append(Move.from_uci(self.pv_table[0][dist_fr_root]))
 
         # Null Move Pruning
         # If we are in zugzwang, this is mistake
@@ -369,12 +365,10 @@ class Searcher:
         ):
             self.nm_tried += 1
             board.push(NULL_MOVE)
-            score = -self.pvs(
-                board, depth - 1 - NMP_REDUC, -beta, -beta + ZW_SEARCH_WIDTH, False, ply + 1, update_pv=False
-            )
+            score = -self.pvs(board, depth - 1 - NMP_REDUC, -beta, -beta + 1, False, ply + 1, update_pv=False)
             board.pop()
 
-            if score >= beta:  # if not strict, illegal move in 3s mate test #17
+            if score >= beta:
                 self.nm += 1
 
                 if ply > 0:
@@ -382,36 +376,49 @@ class Searcher:
                     return score
 
         # Did not prune, do a normal search
+
         found = False
         found_pv = False
-        best = -float('inf')  # best score board.turn can get from this pos
+        best = -float('inf')
         best_move = NULL_MOVE
         move_gen = board.generate_sorted_pseudo_legal_moves(self.history[board.turn], self.cm_hist[board.turn])
         move_gen = board.get_legal_generator(wrap_gen_insert_moves(move_gen, moves_first))
+        # moves other than caps, checks, could be history heuristic good
+        other_moves_tried = 0
+        lmr_depth_term = math.sqrt(depth - 1)
+
         for move, move_type in move_gen:
             found = True
             board.push(move)
-
-            # Futlity Pruning
-            if depth <= 2 and self.ids_depth > 3 and not in_check and not pv_node:
-                eval = evaluate(board)
-                self.ftnodes_tried += 1
-                if eval - FUTILITY_MARGIN >= beta:
-                    best_move = move
-                    best = min(eval, beta)  # at some point should be eval?
-                    self.ftnodes += 1
-                    board.pop()
-                    return best
+            other_moves_tried += 1 if move_type is MoveType.OTHER else 0
+            # # Futlity Pruning
+            # if depth <= 2 and self.ids_depth > 3 and not in_check and not pv_node:
+            #     eval = evaluate(board)
+            #     self.ftnodes_tried += 1
+            #     if eval - FUTILITY_MARGIN >= beta:
+            #         best_move = move
+            #         best = min(eval, beta)  # at some point should be eval?
+            #         self.ftnodes += 1
+            #         board.pop()
+            #         return best
 
             if found_pv:
                 # zero window search around pv to check if it is still pv
-                score = -self.pvs(board, depth - 1, -alpha - ZW_SEARCH_WIDTH, -alpha, can_null, ply + 1, update_pv=True)
+                score = -self.pvs(board, depth - 1, -alpha - 1, -alpha, can_null, ply + 1, update_pv=True)
                 if score > alpha and score < beta:  # check for failure high (> alpha), else keep score
                     self.pvs_research += 1
                     score = -self.pvs(board, depth - 1, -beta, -alpha, can_null, ply + 1, update_pv=True)
             else:
-                score = -self.pvs(board, depth - 1, -beta, -alpha, can_null, ply + 1, update_pv=True)
+                reduction = 0
+                # Late Move Reductions
+                if depth >= LMR_DEPTH and not in_check and not root_node:
+                    reduction = int(0.5 * (lmr_depth_term + math.sqrt(other_moves_tried)))
+                    reduction = min(depth - 1, reduction)  # at most current depth - 1
 
+                score = -self.pvs(board, depth - 1 - reduction, -beta, -alpha, can_null, ply + 1, update_pv=False)
+
+                if score > alpha:
+                    score = -self.pvs(board, depth - 1, -beta, -alpha, can_null, ply + 1, update_pv=True)
             board.pop()
 
             if score > best:

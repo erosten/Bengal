@@ -4,6 +4,9 @@ Notable changes to this project will be documented in this file.
 
 ## [0.0.3] - More Search Improvements
 
+- Rated about 1900 on Lichess Bullet/Blitz/Rapid
+- Preliminary README
+
 #### Search
 
 - History Hueristic for non-capture moves
@@ -12,6 +15,9 @@ Notable changes to this project will be documented in this file.
   - As a side effect, improved performance by not having to check for repetitions in eval
 - Mate pruning on actual nodes instead of only scores (faster on mate detection)
 - Full NMP is back (>= beta, check for one major piece)
+- Futility/Delta Pruning not currently viable while eval is lagging behind
+  - Leave commented for now for later testing
+- Late Move Reductions
 
 #### Eval
 
@@ -19,6 +25,7 @@ Notable changes to this project will be documented in this file.
 
 #### General
 
+- Tested with pypy and has a huge speedup
 - Bugfix for the same move potentially being searched multiple times
 - Remove older search options
 - Codebase-wide logger in utils

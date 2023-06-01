@@ -41,7 +41,7 @@ EG_VALUE = [94, 281, 297, 512, 936, 0]
 # p, n, b, r, q, k
 GAME_PHASE_VALUES = [0, 1, 1, 2, 4, 0]
 
-ONE = "1"
+PAWN_SCALE = 0.35
 ''' TUNE '''
 
 from functools import lru_cache
@@ -264,7 +264,7 @@ def evaluate(board: BoardT, ply: int = 0, verbose: bool = False) -> float:
 
 
     # finishing up
-    pawns_mg = pawns_mgc[WHITE] - pawns_mgc[BLACK]
+    pawns_mg = (pawns_mgc[WHITE] - pawns_mgc[BLACK])*PAWN_SCALE
 
     # mobility
 
