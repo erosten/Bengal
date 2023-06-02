@@ -2,6 +2,7 @@ from .board import (
     BLACK,
     COLORS,
     KING,
+    BISHOP,
     KNIGHT,
     PAWN,
     PIECE_TYPES,
