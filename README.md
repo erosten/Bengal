@@ -61,3 +61,7 @@ This was my first time delving into building a chess engine. Below is a list of 
 - https://github.com/thomasahle/sunfish
 - https://github.com/Disservin/python-chess-engine
 - https://github.com/Alex2262/Antares
+
+# License
+
+[GNU GPLv3](LICENSE.md)
