@@ -2,10 +2,25 @@
 
 Notable changes to this project will be documented in this file.
 
+## [0.0.4] - Perfecting Performance
+
 ## [0.0.3] - More Search Improvements
 
-- Rated about 1900 on Lichess Bullet/Blitz/Rapid
-- Preliminary README
+The goal of this version was to release the bot in the wild on Lichess via AWS, as well as explore
+Late move reductions, add a little more evaluation intelligence, as well as some performance boosts and bugfixes.
+A key find is that these pruning methods lead to reduced performance via the eye test on Lichess.
+The next release will focus on how to evaluate the performance of Bengal and measure improvements from additional search features/improvements.
+
+#### General
+
+- Rated about 1900 on Lichess Bullet/Blitz/Rapid - bot is now live all the time!
+- README added
+- Tested with pypy and has a huge speedup
+- Bugfix for the same move potentially being searched multiple times
+- Remove older search options
+- Codebase-wide logger in utils
+- Cleanup on comments and unused files in repo
+- Bengal-bot updated
 
 #### Search
 
@@ -22,13 +37,6 @@ Notable changes to this project will be documented in this file.
 #### Eval
 
 - Most of pawn eval is implemented
-
-#### General
-
-- Tested with pypy and has a huge speedup
-- Bugfix for the same move potentially being searched multiple times
-- Remove older search options
-- Codebase-wide logger in utils
 
 ## [0.0.2] - Search Improvements + More
 
