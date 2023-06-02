@@ -192,10 +192,6 @@ class Searcher:
             # Principal Variation
             self.pv = [m for m in self.pv_table[0] if m != 0]
             logger.debug('\n' + table)
-            # if abs(score) > 8000:
-            #     yield score, self.pv
-            #     print('mate!')
-            #     break
             yield score, self.pv
 
     def quiesce(
@@ -318,9 +314,7 @@ class Searcher:
             flag = entry[1]
             tt_score = entry[2]
             tt_move = entry[3]
-            if flag == -1:
-                return tt_score
-            elif flag == 0:  # exact
+            if flag == 0:  # exact
                 if tt_move != NULL_MOVE:
                     moves_first.append(tt_move)
 

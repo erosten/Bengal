@@ -1,5 +1,4 @@
-from .board import (  # BB_FILES,; Color,; Square,; SquareSet,; scan_reversed,; shift_down,; shift_down_left,; shift_down_right,; shift_left,; shift_right,; shift_up,; shift_up_left,; shift_up_right,; square_file,; square_rank,
-    BISHOP,
+from .board import (
     BLACK,
     COLORS,
     KING,

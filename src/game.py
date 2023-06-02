@@ -39,15 +39,6 @@ class Game:
     def get_pgn(self):
         return chess.pgn.Game.from_board(self.board)
 
-    def save_evals(self):
-        import matplotlib.pyplot as plt
-
-        plys = [x for x in range(len(self.eval_log))]
-
-        plt.plot(plys, self.eval_log)
-        plt.xlabel('Ply')
-        plt.ylabel('Eval Favoring White')
-
     def play(self):
         if self.done:
             print('Game is over, start another game.')
