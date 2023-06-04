@@ -2,7 +2,7 @@
 
 Bengal is a traditional chess engine, written in Python. The goal of this project is to see how far a chess engine written in Python can really go.
 
-With a sophisticated search function, a modified board representation based on the fantastic [python-chess](https://github.com/niklasf/python-chess) and boosted by [PyPy](https://www.pypy.org/), [Bengal is currently around 1900 ELO on lichess](https://lichess.org/@/BengalBot).
+With a simple search function and a modified board representation based on the fantastic [python-chess](https://github.com/niklasf/python-chess), boosted by [PyPy](https://www.pypy.org/), [Bengal is currently around 1900 ELO on lichess](https://lichess.org/@/BengalBot).
 
 # Engine Features
 
