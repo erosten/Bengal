@@ -2,7 +2,7 @@ import math
 import os
 import time
 from collections import defaultdict
-from typing import Optional, Tuple
+from typing import Optional, Set, Tuple
 
 from chess.polyglot import open_reader
 from chess.syzygy import open_tablebase
@@ -31,7 +31,7 @@ NMP_REDUC = 2
 
 LMR_DEPTH = 3
 
-OPENING_BOOK = True
+OPENING_BOOK = False
 ENDGAME_TABLES = False
 ''' TUNE '''
 
@@ -47,7 +47,7 @@ def wrap_gen_insert_moves(gen, initial_moves):
 
 
 class Searcher:
-    def __init__(self, book_path: Optional[str] = None, syzgy_dir: Optional[str] = None):
+    def __init__(self, book_path: Optional[str] = None, syzgy_dir: Optional[str] = None, pos_hist: Set = None):
 
         # books
         if book_path:
@@ -80,7 +80,10 @@ class Searcher:
             False: [[0 for _ in range(64)] for _ in range(64)],
         }
 
-        self.pos_hist = set()
+        if not pos_hist:
+            self.pos_hist = set()
+        else:
+            self.pos_hist = pos_hist
 
     def find_move(self, board: BoardT, depth: int) -> Move:
         score = -1000
