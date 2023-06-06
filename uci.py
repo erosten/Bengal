@@ -163,16 +163,16 @@ def main():
                         ttm = int(args[2]) / 1000  # seconds
                     elif args[1] == 'wtime':
                         # in seconds
-                        wtime, btime, winc, binc = [int(a) / 1000 for a in args[2::2]]
-                        m = max(N_MOVES, 40)
+                        wtime, btime = int(args[2]) / 1000, int(args[4]) / 1000
+                        if args[5] == 'mvoestogo':
+                            movestogo = int(args[6])
+                        else:
+                            movestogo = N_MOVES
                         t_tot = wtime if board.turn else btime
-                        inc = winc if board.turn else binc
 
-                        ttm = t_tot / m
+                        ttm = t_tot / movestogo
 
-                        if inc:
-                            ttm += inc
-                            strict = ttm < 30
+                        strict = t_tot < 30
 
                     elif args[1] == 'depth':
                         max_depth = int(args[2])
