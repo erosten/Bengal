@@ -4,6 +4,10 @@ Notable changes to this project will be documented in this file.
 
 ## [0.0.4] - Perfecting Performance
 
+#### General
+
+- Added UCI to allow for cute-chess tournaments to determine performance increases
+
 ## [0.0.3] - More Search Improvements
 
 The goal of this version was to release the bot in the wild on Lichess via AWS, as well as explore

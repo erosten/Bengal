@@ -2,7 +2,7 @@ import math
 import os
 import time
 from collections import defaultdict
-from typing import Optional, Set, Tuple
+from typing import Optional, Set
 
 from chess.polyglot import open_reader
 from chess.syzygy import open_tablebase
@@ -236,7 +236,7 @@ class Searcher:
                 return score
         return alpha
 
-    def update_pv(self, move, ply):
+    def update_pv(self, move: Move, ply: int) -> None:
         if move == NULL_MOVE:
             return
 
@@ -259,7 +259,8 @@ class Searcher:
         can_null: bool = True,
         ply: int = 0,
         update_pv=True,
-    ) -> Tuple[float, Move]:
+    ) -> float:
+
         self.nodes += 1
 
         z_hash = board.__hash__()
@@ -464,7 +465,7 @@ class Searcher:
 
             # if no entry or this depth is less or eq to existing
             if not self.tt_score.get(z_hash) or depth <= self.tt_score[z_hash][1]:
-                self.tt_score[z_hash] = (depth, flag, best, best_move, board.copy())
+                self.tt_score[z_hash] = (depth, flag, best, best_move)
 
             return best
         else:  # no moves

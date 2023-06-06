@@ -2,31 +2,6 @@
 # Below are the PST values which work best for rofchade. As you can see very asymmetric. They are defined as if looking to the board from white (so I can understand them better..). The first square in the table [0] is square A8 and the last square [63] is H1. This means that it can be used directly for black, for white you have flip it vertically so you cant take the square XOR 56 for white.
 # So if you want to calculate the MG PST value of a rook on square 'sq', if the rook is WHITE you take value pieceSquareScore[MG][ROOK][sq ^ 56], if the rook is BLACK you take pieceSquareScore[MG][ROOK][sq].
 
-PAWN = 0
-KNIGHT = 1
-BISHOP = 2
-ROOK = 3
-QUEEN = 4
-KING = 5
-
-
-WHITE = 0
-BLACK = 1
-
-WHITE_PAWN = 2*PAWN+WHITE # 0
-BLACK_PAWN = 2*PAWN+BLACK # 1
-WHITE_KNIGHT=2*KNIGHT+WHITE # 2
-BLACK_KNIGHT=2*KNIGHT+BLACK # 3
-WHITE_BISHOP=2*BISHOP+WHITE # 4
-BLACK_BISHOP=2*BISHOP+BLACK # 5
-WHITE_ROOK=2*ROOK+WHITE # 6
-BLACK_ROOK=2*ROOK+BLACK # 7
-WHITE_QUEEN=2*QUEEN+WHITE # 8
-BLACK_QUEEN=2*QUEEN+BLACK # 9
-WHITE_KING=2*KING+WHITE # 10
-BLACK_KING=2*KING+BLACK # 11
-
-
 MG_PAWN = (
       0,   0,   0,   0,   0,   0,  0,   0,
      98, 134,  61,  95,  68, 126, 34, -11,

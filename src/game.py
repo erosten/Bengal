@@ -58,4 +58,4 @@ class Game:
         self.result = self.board.outcome(claim_draw=True)
         print(f'Game ended with {self.result.result()}, by {self.result.termination}, winner {self.result.winner}')
         self.done = True
-        return
+        return self.result

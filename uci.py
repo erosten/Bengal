@@ -3,7 +3,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 
-from src.board import STARTING_BOARD_FEN, Board
+from src.board import STARTING_BOARD_FEN, Board, BoardT
 from src.searcher_pvs import Searcher
 from src.utils import logger
 
@@ -13,7 +13,16 @@ logger.add(sys.stderr, level="ERROR")
 DEFAULT_MAX_DEPTH = 100
 
 
-def go_loop(searcher, board, stop_event, max_movetime=0, stric_time=False, max_depth=100, debug=False):
+def go_loop(
+    searcher: Searcher,
+    board: BoardT,
+    stop_event: Event,
+    max_movetime: int = 0,
+    stric_time: bool = False,
+    max_depth: int = 100,
+    debug: bool = False,
+):
+
     if debug:
         print(f"Going movetime={max_movetime}, depth={max_depth}")
 
@@ -36,6 +45,7 @@ def go_loop(searcher, board, stop_event, max_movetime=0, stric_time=False, max_d
 
         best_move = move
         best_move_scores.append(score)
+
         # Time Management
         t2 = time.time()
         t_search += t2 - t1
@@ -91,18 +101,30 @@ def main():
                 if not args:
                     continue
 
-                elif args[0] in ['quit', 'stop']:
+                elif args[0] == 'quit':
+                    if go_future.running():
+                        do_stop_event.set()
+                        go_future.result()
+                    break
+
+                elif args[0] == 'stop':
                     if go_future.running():
                         do_stop_event.set()
                         go_future.result()
 
                 elif args[0] == 'uci':
-                    print('id name BengalBot')
+                    print('id name Bengal')
                     print('id author erosten')
                     print('uciok')
 
                 elif args[0] == 'isready':
                     print('readyok')
+
+                elif args[0] == 'debug':
+                    if args[1] == 'on':
+                        debug = True
+                    elif args[1] == 'off':
+                        debug = False
 
                 elif args[0] == "position":
                     if args[1] == 'startpos':
@@ -117,7 +139,7 @@ def main():
                             N_MOVES -= 1
 
                     elif args[1] == 'fen':
-                        fen = ' '.join(*args[2:8])
+                        fen = ' '.join(args[2:8])
                         board = Board(fen=fen)
                         pos_hist.clear()
                         pos_hist.add(board._board_pieces_state())

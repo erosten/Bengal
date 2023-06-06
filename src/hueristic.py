@@ -28,8 +28,6 @@ from .board import (
 from .piece_square_tables import EG_TABLE, EG_TABLE_W, MG_TABLE, MG_TABLE_W
 
 # need to change later maybe
-Us = 'US'
-Them = 'Them'
 
 ''' TUNE '''
 MATE_VALUE = 8 * 1025 + 2 * 512 + 2 * 365 + 2 * 337
