@@ -1,0 +1,27 @@
+name: Running some simple tests
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up PyPy 3.9
+        uses: actions/setup-python@v2
+        with:
+          python-version: pypy3.9
+      - name: Add conda to system path
+        run: |
+          # $CONDA is an environment variable pointing to the root of the miniconda directory
+          echo $CONDA/bin >> $GITHUB_PATH
+      - name: Install dependencies
+        run: |
+          conda env update --file environment_pypy.yml --name base
+      - name: Run tests with pytest
+        run: |
+          # verbose and terminate on first test failure
+          pytest pytest_tests/test_search.py --verbose -x
