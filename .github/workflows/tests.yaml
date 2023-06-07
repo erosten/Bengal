@@ -1,0 +1,29 @@
+name: Running some simple tests
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Do not ignore bash profile files. From:
+    # https://github.com/marketplace/actions/setup-miniconda
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up PyPy 3.9
+        uses: actions/setup-python@v4
+        with:
+          python-version: "pypy3.9"
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.2.0
+        with:
+          environment-file: environment_pypy.yaml
+          activate-environment: pypy39_env
+      - name: Run tests with pytest
+        run: |
+          # verbose and terminate on first test failure
+          pytest pytest_tests/test_search.py --verbose -x
