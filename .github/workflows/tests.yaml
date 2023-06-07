@@ -1,7 +1,9 @@
 name: Running some simple tests
 
 on:
-  push:
+  push: [main]
+  pull_request:
+    types: [synchronized, opened, reopened]
   workflow_dispatch:
 
 jobs:
