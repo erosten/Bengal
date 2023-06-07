@@ -16,7 +16,7 @@ def test_mate_in_threes(m8in3_fens):
         if board.is_checkmate():
             mates += 1
 
-    assert len(m8in3_fens) - m8in3_fens < 40
+    assert len(m8in3_fens) - mates < 40
 
 
 def test_mate_in_twos(m8in2_fens):
