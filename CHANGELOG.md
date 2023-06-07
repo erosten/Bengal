@@ -7,6 +7,7 @@ Notable changes to this project will be documented in this file.
 #### General
 
 - Added UCI to allow for cute-chess tournaments to determine performance increases
+- Github workflow for mate in 2/3 tests on push
 
 ## [0.0.3] - More Search Improvements
 
