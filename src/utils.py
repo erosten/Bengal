@@ -3,7 +3,7 @@ import sys
 from loguru import logger
 
 logger.remove()
-logger.add(sys.stderr, level="DEBUG")
+logger.add(sys.stderr, level="INFO")
 
 PIECE_SYMBOLS = {
     'P': '♟',
@@ -19,6 +19,11 @@ PIECE_SYMBOLS = {
     'q': '\033[36m\033[1m♕\033[0m',
     'k': '\033[36m\033[1m♔\033[0m',
 }
+
+
+def set_logger_level(level: str):
+    logger.remove()
+    logger.add(sys.stderr, level=level)
 
 
 def display(board):
