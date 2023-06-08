@@ -2,8 +2,9 @@ import pytest
 import json
 
 from .. import Board
+from .. import set_logger_level
 
-
+set_logger_level('ERROR')
 
 def load_fens(fname):
     data = open(fname).read().splitlines()
