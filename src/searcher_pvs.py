@@ -1,8 +1,8 @@
 import math
 import os
-import time
 from collections import defaultdict
-from typing import Optional, Set
+from time import time
+from typing import List, Optional, Set, Tuple
 
 from chess.polyglot import open_reader
 from chess.syzygy import open_tablebase
@@ -20,18 +20,24 @@ BOOK_SCORE = 1337
 
 DEFAULT_TABLEBASE_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'syzgy_345/')
 
+DEFAULT_DEPTH = 100
+DEFAULT_TIME = 1000  # seconds
+
 
 ''' TUNE '''
-DELTA_PRUNE_SAFETY_MARGIN = EG_VALUE[0] * 1
-FUTILITY_MARGIN = 500
-ZW_SEARCH_WIDTH = EG_VALUE[0]
+OPENING_BOOK = False
 
 NMP_DEPTH = 3
 NMP_REDUC = 2
 
+# Higher -> less control but perhaps a bit better performance (?)
+NODES_PER_TIME_CHECK = 128  # control within approximately 0.1 seconds
+
+
+DELTA_PRUNE_SAFETY_MARGIN = EG_VALUE[0] * 1
+FUTILITY_MARGIN = 500
 LMR_DEPTH = 3
 
-OPENING_BOOK = False
 ENDGAME_TABLES = False
 ''' TUNE '''
 
@@ -47,7 +53,12 @@ def wrap_gen_insert_moves(gen, initial_moves):
 
 
 class Searcher:
-    def __init__(self, book_path: Optional[str] = None, syzgy_dir: Optional[str] = None, pos_hist: Set = None):
+    def __init__(
+        self,
+        book_path: Optional[str] = None,
+        syzgy_dir: Optional[str] = None,
+        pos_hist: Set = None,
+    ):
 
         # books
         if book_path:
@@ -85,10 +96,33 @@ class Searcher:
         else:
             self.pos_hist = pos_hist
 
-    def find_move(self, board: BoardT, depth: int) -> Move:
+        self.start = 0
+        self.max_time = DEFAULT_TIME
+        self.strict_time = False
+
+    def find_move(
+        self,
+        board: BoardT,
+        depth: Optional[int] = DEFAULT_DEPTH,
+        max_time: Optional[float] = DEFAULT_TIME,
+        strict_time: bool = False,  # whether to cut search off at max_time regardless of place
+    ) -> Move:
+
         score = -1000
         moves = []
-        for s, m in self._search_at_depth(board, depth=depth):
+
+        # Set so search fns can see
+        self.start = time()
+        self.max_time = max_time
+        self.strict_time = strict_time
+
+        for s, m in self._search_at_depth(
+            board,
+            depth=depth,
+        ):
+
+            if time() - self.start > self.max_time:
+                return score, moves
             if m:
                 score = s
                 moves = m
@@ -99,7 +133,12 @@ class Searcher:
 
     # iterative depeening on search subroutine
     # should be named _search_at_depth(s)
-    def _search_at_depth(self, board: BoardT, depth: int, can_null: bool = True):
+    def _search_at_depth(
+        self,
+        board: BoardT,
+        depth: int,
+        can_null: bool = True,
+    ) -> Tuple[float, List[str]]:
         # stats
         self.nodes = 0
         self.lmoves = 0
@@ -150,7 +189,7 @@ class Searcher:
 
         for d in range(1, depth + 1):
             self.ids_depth = d
-            t = time.time()
+            t = time()
 
             # if depth == 1:
             score = self.pvs(board, d, can_null=can_null, ply=0)
@@ -161,7 +200,7 @@ class Searcher:
                 score = -score
             # self.pv_length[1:] = [0 for _ in range(63)]
             # self.pv_table[1:][1:] = [[0 for _ in range(63) ] for _ in range(63)]
-            t = time.time() - t
+            t = time() - t
             labels = [
                 'Depth (s)',
                 'Nodes',
@@ -208,6 +247,8 @@ class Searcher:
     ):
         self.qnodes += 1
         stand_pat = evaluate(board, ply)
+        if self.strict_time and self.qnodes % NODES_PER_TIME_CHECK == 0 and time() - self.start > self.max_time:
+            return stand_pat
 
         if stand_pat >= beta:
             return stand_pat
@@ -386,6 +427,10 @@ class Searcher:
         lmr_depth_term = math.sqrt(depth - 1)
 
         for move, move_type in move_gen:
+
+            if self.strict_time and self.nodes % NODES_PER_TIME_CHECK == 0 and time() - self.start > self.max_time:
+                return best
+
             found = True
             board.push(move)
             other_moves_tried += 1 if move_type is MoveType.OTHER else 0
