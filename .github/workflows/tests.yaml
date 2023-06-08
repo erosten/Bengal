@@ -30,4 +30,4 @@ jobs:
       - name: Run tests with pytest
         run: |
           # verbose and terminate on first test failure
-          pytest pytest_tests/test_search.py --verbose -x
+          pypy -m pytest tests/ -vv -s

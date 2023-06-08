@@ -1,17 +1,17 @@
-import os
-import sys
+from chess import Board as ChessBoard
+from chess import BoardT as ChessBoardT
+from .. import Board as CustomBoard
+from .. import BoardT as CustomBoardT
 
-p_to_src = os.path.abspath(os.path.dirname(os.path.abspath('')))
-sys.path.append(p_to_src)
-
-from src.board import Board
+from tqdm import tqdm
 
 
-def perft_test(depth: int, board: Board) -> int:
+
+def perft_test(depth: int, board: CustomBoardT) -> int:
     if depth >= 1:
         count = 0
-
-        for move in board.generate_sorted_moves():
+        move_gen = board.get_legal_generator(board.generate_sorted_pseudo_legal_moves())
+        for move, move_type in move_gen:
             board.push(move)
             count += perft_test(depth - 1, board)
             board.pop()
@@ -21,7 +21,7 @@ def perft_test(depth: int, board: Board) -> int:
         return 1
 
 
-def perft(depth: int, board: Board) -> int:
+def perft(depth: int, board: ChessBoardT) -> int:
     if depth >= 1:
         count = 0
 
@@ -35,95 +35,24 @@ def perft(depth: int, board: Board) -> int:
         return 1
 
 
-import json
-import time
 
-from tqdm import tqdm
+def test_perft(m8in3_fens, m8in2_fens, perft_fen_data):
 
-
-def test(fens):
-    n1 = []
-    n2 = []
-    for fen in fens:
-        b = Board(fen)
-        d = 3
-        pnodes = perft(d, b)
-        pnodes2 = perft_test(d, b)
-
-        n1.append(pnodes)
-        n2.append(pnodes2)
-
-    print('Reg ', n1)
-    print('Test ', n2)
-
-
-from typing import List, Tuple
-
-
-def gen(additional_tests: List[Tuple[str, int]] = []):
-    json_out = []
-    n1 = []
-    n2 = []
-    from data.original_search_test_data import DATA
-
-    d = sorted(DATA, key=lambda x: x['depth'])
-    for test in tqdm(d):
-        if test['depth'] >= 4:
-            break
-        print(test)
-        out = {}
-        n = test['nodes']
-        d = test['depth']
-        n1.append(n)
+    for fen in tqdm(m8in3_fens, desc = 'Mate in 3 perft'):
+        actual = perft(3, ChessBoard(fen))
+        pred = perft_test(3, CustomBoard(fen))
+        assert actual == pred
+    
+    for fen in tqdm(m8in2_fens, desc = 'Mate in 2 perft'):
+        actual = perft(3, ChessBoard(fen))
+        pred = perft_test(3, CustomBoard(fen))
+        assert actual == pred
+    
+    d = sorted(perft_fen_data, key=lambda x: x['depth'])
+    for test in tqdm(d, desc = 'Various Position perft'):
+        depth = test['depth']
         fen = test['fen']
-        out['nodes'] = n
-        out['depth'] = d
-        out['fen'] = fen
-        b = Board(fen)
-        out['perft'] = perft(d, b)
+        actual = perft(depth, ChessBoard(fen))
+        pred = perft_test(depth, CustomBoard(fen))
+        assert actual == pred    
 
-        t1 = time.time()
-        n = perft_test(d, b)
-        t = time.time() - t1
-        out['perft_time'] = t
-        out['perft_nodes'] = n
-        n2.append(n)
-        json_out.append(out)
-
-    # assumed no GT
-    for (fen, d) in additional_tests:
-        out = {}
-        print(fen)
-        b = Board(fen)
-        t1 = time.time()
-        n = perft(d, b)
-        t = time.time() - t1
-        out['nodes'] = n
-        n1.append(n)
-        out['depth'] = d
-        out['fen'] = fen
-        t1 = time.time()
-        n = perft_test(d, b)
-        t = time.time() - t1
-        out['perft_time'] = t
-        out['perft_nodes'] = n
-        n2.append(n)
-        json_out.append(out)
-
-    json_formatted_str = json.dumps(json_out, indent=2)
-
-    print(json_formatted_str)
-    equal = [x == y for x, y in zip(n1, n2)]
-
-    print(f'Perft passing: {sum(equal)}/{len(n1)}')
-    import pdb
-
-    pdb.set_trace()
-
-
-ADDITIONAL_DATA = [('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', 4)]
-
-if __name__ == '__main__':
-    gen(additional_tests=ADDITIONAL_DATA)
-    # test(fens = [])
-    # test(fens = ['r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10'])
