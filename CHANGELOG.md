@@ -7,7 +7,23 @@ Notable changes to this project will be documented in this file.
 #### General
 
 - Added UCI to allow for cute-chess tournaments to determine performance increases
-- Github workflow for mate in 2/3 tests on push
+
+#### Search
+
+- Time management now built into search
+  - Check in IDS
+  - Check per 2048 nodes and return if strict_time is specified when finding a move
+
+#### Testing
+
+- All tests moved to pytest
+
+  - Mate in 2
+  - Mate in 3
+  - Perft check with custom move generator
+  - WAC200
+
+- Github workflow for tests set to trigger on PR commits, and pushes to main
 
 ## [0.0.3] - More Search Improvements
 
