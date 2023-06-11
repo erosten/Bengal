@@ -40,7 +40,41 @@ conda create -c conda-forge -n pypy39 pypy python=3.9
 Installing requirements
 
 ```
-pip install -r requirements.txt
+conda env update -n pypy39 --file environment_pypy.yaml
+```
+
+Activate the environment
+
+```
+conda activate pypy39
+```
+
+The easiest way to play bengal is through the terminal
+
+```
+python3 play_vs_ai.py
+```
+
+Make a move like `e2e4`
+
+```
+------------------------------------------------------------------
+
+
+8 ♖ ♘ ♗ ♕ ♔ ♗ ♘ ♖
+7 ♙ ♙ ♙ ♙ ♙ ♙ ♙ ♙   
+6 ♢ ♢ ♢ ♢ ♢ ♢ ♢ ♢
+5 ♢ ♢ ♢ ♢ ♢ ♢ ♢ ♢
+4 ♢ ♢ ♢ ♢ ♢ ♢ ♢ ♢
+3 ♢ ♢ ♢ ♢ ♢ ♢ ♢ ♢
+2 ♟ ♟ ♟ ♟ ♟ ♟ ♟ ♟
+1 ♜ ♞ ♝ ♛ ♚ ♝ ♞ ♜   
+  A B C D E F G H
+
+------------------------------------------------------------------
+
+Current eval (white's turn): 0.0
+Make a move: e2e4
 ```
 
 # Changes

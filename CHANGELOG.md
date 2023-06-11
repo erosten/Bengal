@@ -6,7 +6,8 @@ Notable changes to this project will be documented in this file.
 
 #### General
 
-- Added UCI to allow for cute-chess tournaments to determine performance increases
+- Added UCI
+  - Mainly to allow for cutechess tournaments to determine performance impacts of new features
 
 #### Search
 
