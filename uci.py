@@ -5,10 +5,10 @@ from threading import Event
 
 from src.board import STARTING_BOARD_FEN, Board, BoardT
 from src.searcher_pvs import Searcher
-from src.utils import logger
+from src.utils import logger, set_logger_level
 
-logger.remove()
-logger.add(sys.stderr, level="ERROR")
+
+set_logger_level('ERROR')
 
 DEFAULT_MAX_DEPTH = 100
 
@@ -18,43 +18,23 @@ def go_loop(
     board: BoardT,
     stop_event: Event,
     max_movetime: int = 0,
-    stric_time: bool = False,
+    strict_time: bool = False,
     max_depth: int = 100,
     debug: bool = False,
 ):
 
     if debug:
-        print(f"Going movetime={max_movetime}, depth={max_depth}")
+        print(f"Going movetime={max_movetime}, depth={max_depth}", flush=True)
 
     start = time.time()
-    best_move = None
     depth = 0
-    best_move_repeats = 0
-    best_move_scores = []
-    t1 = time.time()
+    t1 = start
     t_search = 0
     for score, pv in searcher._search_at_depth(board, max_depth):
-        depth += 1
-        if depth - 1 >= max_depth:
-            break
-        move = pv[0]
-        if move == best_move:
-            best_move_repeats += 1
-        else:
-            best_move_repeats = 0
-
-        best_move = move
-        best_move_scores.append(score)
-
         # Time Management
         t2 = time.time()
         t_search += t2 - t1
-        # if d > d_avg and best_move_repeats >= 4:
-        #     break
-        if stric_time and t_search + (t2 - t1) > max_movetime:
-            break
-        if t_search > max_movetime:  # if time to search longer than allowed time, break
-            break
+        depth += 1
 
         elapsed = time.time() - start
         fields = {
@@ -65,10 +45,19 @@ def go_loop(
             "score cp": score,
             "pv": ' '.join(pv),
         }
-        print("info", " ".join(f"{k} {v}" for k, v in fields.items()))
+        info_str = " ".join(f"{k} {v}" for k, v in fields.items())
+        print(f"info {info_str}",flush=True)
 
-        # We may not have a move yet at depth = 1
+        # Have a move (depth > 1), break conditions below
         if depth > 1:
+            # Depth limiting case
+            if depth - 1 >= max_depth:
+                break
+            # same time for last depth search will put us over 
+            # and we are in strict time, just break now
+            if strict_time and (elapsed + t_search > max_movetime):
+                break
+            # currently over time, break now
             if elapsed > max_movetime:
                 break
             if stop_event.is_set():
@@ -78,7 +67,7 @@ def go_loop(
     # go-loop before we got stop_event. Unfortunately we currently don't know if
     # we are in "go infinite" since it's simply translated to "go depth 100".
 
-    print("bestmove", pv[0] if pv else "(none)")
+    print("bestmove", pv[0] if pv else "(none)",flush=True)
 
 
 def main():
@@ -90,7 +79,7 @@ def main():
     board = Board()
     pos_hist = set()
     N_MOVES = 100
-    with ThreadPoolExecutor(max_workers=1) as exec:
+    with ThreadPoolExecutor() as exec:
         # Noop future to get started
         go_future = exec.submit(lambda: None)
         do_stop_event = Event()
@@ -171,7 +160,6 @@ def main():
                         t_tot = wtime if board.turn else btime
 
                         ttm = t_tot / movestogo
-
                         strict = t_tot < 30
 
                     elif args[1] == 'depth':
@@ -180,7 +168,14 @@ def main():
                     N_MOVES -= 1
                     do_stop_event.clear()
                     go_future = exec.submit(
-                        go_loop, searcher, board, do_stop_event, ttm, strict, max_depth, debug=debug
+                        go_loop, 
+                        searcher, 
+                        board, 
+                        do_stop_event, 
+                        ttm, 
+                        strict, 
+                        max_depth, 
+                        debug
                     )
 
                     # Make sure we get informed if the job fails
@@ -188,7 +183,6 @@ def main():
                         fut.result(timeout=0)
 
                     go_future.add_done_callback(callback)
-
             except (KeyboardInterrupt, EOFError):
                 if go_future.running():
                     if debug:
