@@ -153,10 +153,10 @@ def main():
                     elif args[1] == 'wtime':
                         # in seconds
                         wtime, btime = int(args[2]) / 1000, int(args[4]) / 1000
-                        if args[5] == 'mvoestogo':
+                        if args[5] == 'movestogo':
                             movestogo = int(args[6])
                         else:
-                            movestogo = N_MOVES
+                            movestogo = max(N_MOVES, 1)
                         t_tot = wtime if board.turn else btime
 
                         ttm = t_tot / movestogo
