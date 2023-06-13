@@ -1,4 +1,4 @@
-name: pypy39_chess
+name: bengalchess_pypy39
 channels:
   - conda-forge
   - defaults
@@ -64,4 +64,3 @@ dependencies:
       - python-chess==1.999
       - requests==2.31.0
       - urllib3==2.0.2
-prefix: /home/erik/miniconda3/envs/pypy39_chess
