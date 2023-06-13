@@ -2,7 +2,9 @@
 
 Bengal is a traditional chess engine, written in Python. The goal of this project is to see how far a chess engine written in Python can really go.
 
-With a principal variation search function, a modified board representation based on the fantastic [python-chess](https://github.com/niklasf/python-chess) and boosted by [PyPy](https://www.pypy.org/), [Bengal is currently around 1900 ELO on lichess](https://lichess.org/@/BengalBot).
+With a principal variation search function, a modified board representation based on the fantastic [python-chess](https://github.com/niklasf/python-chess) and boosted by [PyPy](https://www.pypy.org/), [Bengal is currently around 1900 ELO on lichess](https://lichess.org/@/BengalBot) and I hope to continue to improve Bengal's strength.
+
+This code is being actively developed. If something does not work or you encounter any problems, please feel free to open an issue and let me know.
 
 # Engine Features
 
@@ -77,13 +79,13 @@ Current eval (white's turn): 0.0
 Make a move: e2e4
 ```
 
-# Changes
+# Recent Updates
 
-See [CHANGELOG.md](CHANGELOG.md)
+See [CHANGELOG.md](CHANGELOG.md) for recent changes and some random thoughts.
 
 # Useful Links
 
-This was my first time delving into building a chess engine. Below is a list of useful links, which were invaluable on the journey.
+This was my first time building a chess engine. Below is a list of useful links, which were invaluable on the journey.
 
 ## General Resources
 
