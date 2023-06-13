@@ -102,7 +102,7 @@ def main():
                         go_future.result()
 
                 elif args[0] == 'uci':
-                    print('id name Bengal')
+                    print('id name BENCH_BENGAL')
                     print('id author erosten')
                     print('uciok')
 

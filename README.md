@@ -1,3 +1,9 @@
+# Bengal Bench
+
+Benchmarked somewhere inbetween v0.03 and v0.04 to establish a point to improve from
+
+
+
 # Bengal v0.03
 
 Bengal is a traditional chess engine, written in Python. The goal of this project is to see how far a chess engine written in Python can really go.
