@@ -15,7 +15,7 @@ async def test_self_play():
     _transport, engine = await chess.engine.popen_uci(bengal_engine_path)
 
     wtime = 60 
-    btime = 5
+    btime = 60
     winc = 1
     binc = 1 
 
