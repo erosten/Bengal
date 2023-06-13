@@ -32,6 +32,7 @@ dependencies:
   - pypy=7.3.11=0_pypy39
   - pypy3.9=7.3.11=h9557127_1
   - pytest=7.3.1=py39h06a4308_0
+  - pytest-asyncio=0.20.3=py39h06a4308_0
   - python=3.9.16=0_73_pypy
   - python_abi=3.9=3_pypy39_pp73
   - pyyaml=6.0=py39h5eee18b_1

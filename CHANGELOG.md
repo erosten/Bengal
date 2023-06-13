@@ -23,6 +23,7 @@ Notable changes to this project will be documented in this file.
   - Mate in 3
   - Perft check with custom move generator
   - WAC200
+  - Executable + UCI interface test
 
 - Github workflow for tests set to trigger on PR commits, and pushes to main
 
