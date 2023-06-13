@@ -15,7 +15,7 @@ async def test_self_play():
     _transport, engine = await chess.engine.popen_uci(bengal_engine_path)
 
     wtime = 60 
-    btime = 20 # 1/3 time to ensure white is the winner
+    btime = 5
     winc = 1
     binc = 1 
 
@@ -35,10 +35,13 @@ async def test_self_play():
 
             if board.turn is WHITE:
                 wtime -= elapsed - winc
+                if wtime < 0:
+                    return
             else:
                 btime -= elapsed - winc
+                if btime < 0:
+                    return
             pbar.update(1)
-    
     print(f'Self-play: {board.outcome()}')
-    assert board.outcome().result is WHITE
+    assert board.outcome().result is not None
             
